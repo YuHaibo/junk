@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  Junk — frontend (v3.0.3)
+  Junk — frontend (v3.0.4)
   ═══════════════════════════════════════════════════════════════════════════════
 
   New in v3.0.0:
@@ -125,13 +125,16 @@
       -webkit-backdrop-filter: blur(40px) saturate(180%);
       border: none;
       border-radius: 14px;
-      /* Subtle ring + drop shadow visible on all platforms.                    */
-      /* On macOS the vibrancy layer is beneath; these sit on top of it.        */
+      /* Edge ring: defines the window boundary on all platforms.              */
+      /* macOS: OS native shadow (shadow:true in tauri.conf) handles the big   */
+      /*   ambient drop shadow outside the frame. CSS only adds the crisp ring */
+      /*   and a hair of inner glow so the frosted edge looks polished.        */
+      /* Windows/Linux: keep the tighter CSS drop shadow as fallback.          */
       box-shadow:
-        0 0 0 0.5px rgba(0,0,0,0.18),          /* 0.5px inner ring — crisp edge  */
-        0 0 0 1px   rgba(255,255,255,0.30),     /* white glow ring               */
-        0 20px 60px rgba(0,0,0,0.28),           /* ambient drop shadow           */
-        0  4px 16px rgba(0,0,0,0.16);           /* tight under-shadow            */
+        0 0 0 0.5px rgba(0,0,0,0.20),          /* crisp outer ring — visible on light bg */
+        0 0 0 1px   rgba(255,255,255,0.25),     /* inner white glow                       */
+        0  2px  8px rgba(0,0,0,0.12),           /* tight near-shadow (Windows/Linux only) */
+        0 12px 40px rgba(0,0,0,0.18);           /* ambient fallback (Windows/Linux only)  */
       overflow: hidden;
       animation: fly-in 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
       transition: background 0.2s;
@@ -706,7 +709,7 @@
             &nbsp;·&nbsp;
             To fully quit: Activity Monitor → Junk → quit
           </span>
-          <span id="current-version">v3.0.3</span>
+          <span id="current-version">v3.0.4</span>
         </div>
 
       </div>
@@ -1558,7 +1561,7 @@
     // Restore custom hotkey (re-registers in Rust if user had changed it)
     restoreHotkey().catch(() => {});
 
-    console.log('[junk] v3.0.3 loaded. IPC bridge:', getInvoke() ? 'OK' : 'NOT FOUND');
+    console.log('[junk] v3.0.4 loaded. IPC bridge:', getInvoke() ? 'OK' : 'NOT FOUND');
   </script>
 </body>
 </html>
