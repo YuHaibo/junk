@@ -16,7 +16,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-22c55e?style=flat-square)](LICENSE)
 [![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%20v2-ffc131?style=flat-square&logo=tauri)](https://v2.tauri.app)
 [![Rust](https://img.shields.io/badge/Rust-1.70%2B-f74c00?style=flat-square&logo=rust)](https://www.rust-lang.org)
-[![Website](https://img.shields.io/badge/website-gojunk.app-5b5bf6?style=flat-square)](https://gojunk.app)
+[![Website](https://img.shields.io/badge/website-thejunk.app-5b5bf6?style=flat-square)](https://thejunk.app)
 
 ---
 
@@ -180,7 +180,7 @@ The "Check now" button triggers an immediate check and shows the result inline:
 
 ### Credits
 
-The Credits section explains how to truly quit Junk and links to [gojunk.app](https://gojunk.app) and the GitHub repo.
+The Credits section explains how to truly quit Junk and links to [thejunk.app](https://thejunk.app) and the GitHub repo.
 
 > **To truly quit Junk:** open Activity Monitor (macOS) or Task Manager (Windows), find "Junk", and force-quit. By design, ⌘Q and × hide the window — the process stays alive so the shortcut always works. This is the same architecture used by Alfred, Paste, and Magnet.
 
