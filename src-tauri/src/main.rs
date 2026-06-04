@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Junk — a global-hotkey scratchpad built with Tauri v2
 //
-// Architecture overview (v3.0.2)
+// Architecture overview (v3.0.3)
 // ─────────────────────────────────────────────────────────────────────────────
 //
 // ┌──────────────────────────────────────────────────────────────────────────┐
@@ -56,9 +56,13 @@ use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_autostart::ManagerExt as AutostartExt;
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
-// Native window vibrancy/blur effects.
-// macOS: NSVisualEffectView with corner_radius — the ONLY way to get truly
-//   rounded corners (CSS border-radius cannot clip the WKWebView frame).
+// Native window effects.
+// macOS strategy (two-step):
+//   1. apply_vibrancy — adds NSVisualEffectView for frosted-glass background.
+//      Its corner_radius only rounds the blur subview, NOT the window frame.
+//   2. set_macos_window_corner_radius — walks nsView → NSWindow → contentView
+//      → CALayer and sets cornerRadius + masksToBounds so the compositor
+//      actually clips everything (WKWebView included) to rounded corners.
 // Windows: Acrylic blur effect (Windows 10/11).
 #[cfg(target_os = "macos")]
 use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
@@ -560,6 +564,68 @@ fn set_macos_activation_policy(app: &AppHandle) {
     }
 }
 
+// ── macOS: set rounded corners on the NSWindow contentView CALayer ───────────
+//
+// Why this is needed:
+//   apply_vibrancy() adds an NSVisualEffectView subview and rounds IT, but the
+//   NSWindow frame remains rectangular. The WKWebView sits ABOVE the blur view
+//   and is still square-clipped by the window frame, so CSS alone can't fix it.
+//
+// What this does:
+//   nsView (WKWebView) → [nsView window] → NSWindow
+//                      → [window contentView] → NSView (content view)
+//                      → [contentView layer] → CALayer
+//   Sets layer.cornerRadius = 14.0 and layer.masksToBounds = YES.
+//   masksToBounds is what does the actual pixel clip at the compositor level.
+//
+// Safety: all pointers are non-null (guarded); called on the main thread.
+#[cfg(target_os = "macos")]
+unsafe fn set_macos_window_corner_radius(window: &tauri::WebviewWindow, radius: f64) {
+    use objc2::msg_send;
+    use objc2::runtime::AnyObject;
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+
+    let Ok(handle) = window.window_handle() else { return };
+    let RawWindowHandle::AppKit(appkit) = handle.as_raw() else { return };
+
+    // ns_view is the WKWebView — a NonNull<c_void> pointer to the NSView.
+    let ns_view: *mut AnyObject = appkit.ns_view.as_ptr().cast();
+
+    // 1. Walk up to the NSWindow that owns this view.
+    let ns_window: *mut AnyObject = msg_send![ns_view, window];
+    if ns_window.is_null() {
+        log::warn!("set_macos_window_corner_radius: [nsView window] returned nil");
+        return;
+    }
+
+    // 2. Get the NSWindow's contentView (the root view of the window).
+    let content_view: *mut AnyObject = msg_send![ns_window, contentView];
+    if content_view.is_null() {
+        log::warn!("set_macos_window_corner_radius: [nsWindow contentView] returned nil");
+        return;
+    }
+
+    // 3. Enable layer-backing on the content view (idempotent if already set).
+    let () = msg_send![content_view, setWantsLayer: true];
+
+    // 4. Grab the backing CALayer.
+    let layer: *mut AnyObject = msg_send![content_view, layer];
+    if layer.is_null() {
+        log::warn!("set_macos_window_corner_radius: [contentView layer] returned nil");
+        return;
+    }
+
+    // 5. Set corner radius — this alone doesn't clip; we also need masksToBounds.
+    // CGFloat = f64 on all 64-bit Apple platforms; cast explicitly to be safe.
+    let () = msg_send![layer, setCornerRadius: radius as f64];
+
+    // 6. masksToBounds = YES — this is what actually clips child layers to the
+    //    rounded rect. Without it, cornerRadius has no visual effect.
+    let () = msg_send![layer, setMasksToBounds: true];
+
+    log::info!("macOS contentView layer cornerRadius={radius} masksToBounds=YES");
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 fn main() {
@@ -600,34 +666,36 @@ fn main() {
             set_macos_activation_policy(handle);
 
             // ── Native window effects ──────────────────────────────────────────
-            // Apply OS-level vibrancy / blur BEFORE showing the window.
-            // This is the only reliable way to get truly rounded corners on macOS:
-            // NSVisualEffectView with corner_radius clips the entire compositor
-            // layer — CSS border-radius cannot do this for WKWebView.
             if let Some(window) = handle.get_webview_window("main") {
                 #[cfg(target_os = "macos")]
                 {
-                    // HudWindow = a neutral frosted glass that adapts to light/dark.
-                    // corner_radius = 14.0 px — matches the CSS border-radius on .window.
-                    // state = None — let the system choose FollowsWindowActiveState.
+                    const RADIUS: f64 = 14.0;
+
+                    // Step 1: frosted-glass NSVisualEffectView background.
+                    // HudWindow adapts to light/dark automatically.
+                    // The corner_radius here only rounds the blur subview itself,
+                    // not the window frame — step 2 does that.
                     if let Err(e) = apply_vibrancy(
                         &window,
                         NSVisualEffectMaterial::HudWindow,
                         None,
-                        Some(14.0),
+                        Some(RADIUS),
                     ) {
                         log::warn!("apply_vibrancy failed (non-fatal): {e}");
                     } else {
-                        log::info!("macOS vibrancy applied (HudWindow, r=14)");
+                        log::info!("macOS vibrancy applied (HudWindow, r={RADIUS})");
                     }
+
+                    // Step 2: set cornerRadius + masksToBounds on the NSWindow's
+                    // contentView CALayer. This clips the entire compositor subtree
+                    // (including the WKWebView) to the rounded rect. Without this,
+                    // the WKWebView renders over the rounded blur corners as a square.
+                    unsafe { set_macos_window_corner_radius(&window, RADIUS) };
                 }
 
                 #[cfg(target_os = "windows")]
                 {
                     // Acrylic effect: semi-transparent blur tinted white.
-                    // None = no tint override (uses system acrylic colour).
-                    // Note: has performance cost when resizing on Windows 11 22621+;
-                    // acceptable for a small scratchpad window.
                     if let Err(e) = apply_acrylic(&window, None) {
                         log::warn!("apply_acrylic failed (non-fatal): {e}");
                     } else {

@@ -1,7 +1,7 @@
 [package]
 # The binary crate name. Tauri uses this as the executable name on all platforms.
 name = "junk"
-version = "3.0.2"
+version = "3.0.3"
 edition = "2021"
 # Minimum supported Rust version. 1.70 is the floor for Tauri v2.
 rust-version = "1.70"
@@ -93,12 +93,19 @@ strip = "debuginfo"
 panic = "abort"
 
 # ── Platform-specific: native window effects ──────────────────────────────────
-# window-vibrancy is the only reliable way to get truly rounded corners on macOS.
-# CSS border-radius does NOT clip the WKWebView frame — only NSVisualEffectView
-# with a corner_radius achieves pixel-perfect rounding at the OS compositor level.
-# The same crate version is already used by Tauri internally (same raw-window-handle).
+# window-vibrancy applies the NSVisualEffectView frosted-glass blur.
+# objc2 / objc2-app-kit are used to set cornerRadius on the NSWindow's
+# contentView CALayer — the ONLY reliable way to clip the WKWebView to
+# rounded corners at the OS compositor level on macOS.
 [target.'cfg(target_os = "macos")'.dependencies]
 window-vibrancy = "0.6"
+# objc2 + objc2-app-kit are transitive deps of window-vibrancy; we declare
+# them explicitly so we can use NSView / NSWindow in our own setup() code.
+objc2 = "0.6.0"
+objc2-app-kit = { version = "0.3.0", default-features = false, features = ["NSView", "NSWindow"] }
+# raw-window-handle is a transitive dep; we declare it explicitly to use
+# HasWindowHandle / AppKitWindowHandle in our own setup code.
+raw-window-handle = "0.6"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 window-vibrancy = "0.6"
