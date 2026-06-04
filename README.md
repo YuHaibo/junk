@@ -9,7 +9,7 @@
   the flying scratchpad — built with Rust + Tauri v2
 ```
 
-[![Version](https://img.shields.io/badge/version-3.0.0-5b5bf6?style=flat-square)](https://github.com/paulfxyz/junk/releases)
+[![Version](https://img.shields.io/badge/version-3.0.4-5b5bf6?style=flat-square)](https://github.com/paulfxyz/junk/releases)
 [![macOS](https://img.shields.io/badge/macOS-universal-black?style=flat-square&logo=apple)](https://github.com/paulfxyz/junk/releases)
 [![Windows](https://img.shields.io/badge/Windows-x64-0078d4?style=flat-square&logo=windows)](https://github.com/paulfxyz/junk/releases)
 [![Linux](https://img.shields.io/badge/Linux-AppImage%20%7C%20deb-fcc624?style=flat-square&logo=linux&logoColor=black)](https://github.com/paulfxyz/junk/releases)
@@ -72,10 +72,13 @@ Junk is designed to fail none of these tests. It appears in ~80 ms. It asks noth
 | **Paste anywhere** | ⌘V / Ctrl+V works even without clicking the textarea first |
 | **Custom shortcut** | Change ⌘J to any key combo in Preferences — live re-registration, no restart |
 | **Position memory** | Remembers where you dragged it between sessions via `PhysicalPosition` IPC |
+| **Size memory** | Remembers window size between sessions — restored on every focus |
 | **Font size** | 14–28 px slider in Preferences — drives CSS custom property, live preview |
 | **Dark mode** | Light / Auto / Dark — Auto follows `prefers-color-scheme` with live listener |
 | **Markdown preview** | ⌘M toggle — inline vanilla-JS parser, no library, zero bundle impact |
 | **Export** | Footer copy button — copies all content to clipboard with "Copied!" feedback |
+| **Rounded corners** | True OS-level rounded corners via `objc2` CALayer `masksToBounds` (macOS) |
+| **Native window shadow** | macOS WindowServer drop shadow via `"shadow": true` — adapts to dark mode |
 
 ---
 
@@ -83,7 +86,7 @@ Junk is designed to fail none of these tests. It appears in ~80 ms. It asks noth
 
 ### macOS (Universal — Apple Silicon + Intel)
 
-1. Download **`Junk_3.0.0_universal.dmg`** from [Releases](https://github.com/paulfxyz/junk/releases)
+1. Download **`Junk_3.0.4_universal.dmg`** from [Releases](https://github.com/paulfxyz/junk/releases)
 2. Open the DMG → drag **Junk** into **Applications**
 3. Remove the Gatekeeper quarantine flag:
 
@@ -101,7 +104,7 @@ Junk is designed to fail none of these tests. It appears in ~80 ms. It asks noth
 
 ### Windows
 
-1. Download **`Junk_3.0.0_x64-setup.exe`** from [Releases](https://github.com/paulfxyz/junk/releases)
+1. Download **`Junk_3.0.4_x64-setup.exe`** from [Releases](https://github.com/paulfxyz/junk/releases)
 2. Run the installer. Windows SmartScreen will show a blue warning — click **More info** → **Run anyway**
 
    > **Why SmartScreen?** The binary is not code-signed with a Windows EV certificate ($200–500/yr). The source is fully public — build it yourself if you prefer (instructions below).
@@ -112,7 +115,7 @@ Junk is designed to fail none of these tests. It appears in ~80 ms. It asks noth
 **MSI (enterprise / silent deployment):**
 
 ```
-msiexec /i Junk_3.0.0_x64_en-US.msi /quiet
+msiexec /i Junk_3.0.4_x64_en-US.msi /quiet
 ```
 
 ---
@@ -120,9 +123,9 @@ msiexec /i Junk_3.0.0_x64_en-US.msi /quiet
 ### Linux — AppImage
 
 ```sh
-wget https://github.com/paulfxyz/junk/releases/latest/download/Junk_3.0.0_amd64.AppImage
-chmod +x Junk_3.0.0_amd64.AppImage
-./Junk_3.0.0_amd64.AppImage
+wget https://github.com/paulfxyz/junk/releases/latest/download/Junk_3.0.4_amd64.AppImage
+chmod +x Junk_3.0.4_amd64.AppImage
+./Junk_3.0.4_amd64.AppImage
 ```
 
 Portable — runs on any modern x86_64 Linux without installation. No sudo required.
@@ -134,8 +137,8 @@ Portable — runs on any modern x86_64 Linux without installation. No sudo requi
 ### Linux — .deb (Debian / Ubuntu)
 
 ```sh
-wget https://github.com/paulfxyz/junk/releases/latest/download/Junk_3.0.0_amd64.deb
-sudo dpkg -i Junk_3.0.0_amd64.deb
+wget https://github.com/paulfxyz/junk/releases/latest/download/Junk_3.0.4_amd64.deb
+sudo dpkg -i Junk_3.0.4_amd64.deb
 junk
 ```
 
@@ -173,7 +176,9 @@ A system-level toggle. When enabled, Junk registers itself as an OS login item:
 | Windows | `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run` registry key |
 | Linux | `~/.config/autostart/junk.desktop` |
 
-The toggle reads the actual OS state on every panel open — stays accurate if you toggled it from System Settings separately.
+The toggle reads the actual OS state on every panel open — stays accurate if you toggled it from System Settings separately. We never cache the launch-at-login state in JavaScript; every panel open calls `get_prefs` which calls `autolaunch().is_enabled()` fresh from the OS.
+
+The underlying mechanism on macOS is a per-user `launchd` LaunchAgent plist — no admin privileges, no system-level daemons. `launchd` reads it at login and starts Junk before the user's first keypress. On Windows, the `Run` registry key is under `HKCU` (current user) — no elevation required. On Linux the XDG autostart spec places a `.desktop` file in `~/.config/autostart/` which most login managers and desktop environments pick up automatically.
 
 ### Auto-check for updates
 
@@ -181,9 +186,11 @@ When enabled (default: on), Junk silently checks the GitHub Releases API ~2 seco
 
 The "Check now" button triggers an immediate check and shows the result inline:
 
-- **"You're up to date (3.0.0)"** — green
-- **"Update available: v2.x.x"** — purple, clickable link to releases page
+- **"You're up to date (3.0.4)"** — green
+- **"Update available: v3.x.x"** — purple, clickable link to releases page
 - **"Could not check — are you online?"** — red if the request fails
+
+The check is performed entirely in Rust via `tauri-plugin-http` — it never touches `window.fetch()`, so it is not blocked by the WebView's Content Security Policy. The current version is read from `CARGO_PKG_VERSION` at compile time — there are no hardcoded version strings in JS, and the frontend version label can never drift from the binary version.
 
 ### Custom shortcut
 
@@ -191,9 +198,18 @@ Click the shortcut field in Preferences and press any key. Junk immediately unre
 
 Keys not available: bare modifier keys (Shift, Ctrl, Meta) and Escape (already reserved). Any letter, digit, F-key, Space, or punctuation key works.
 
+The key is captured as `KeyboardEvent.code` (e.g. `"KeyJ"`, `"F2"`, `"Space"`) rather than `KeyboardEvent.key` (e.g. `"j"`, `"F2"`, `" "`). This is deliberate: `.code` is the physical key position on the keyboard, layout-independent — it works correctly on AZERTY, Dvorak, Colemak, and every other keyboard layout. `.key` would produce incorrect characters on non-QWERTY layouts.
+
 ### Font size
 
 A slider from 14 px to 28 px drives a CSS custom property `--font-size` on `:root`. Both the editor textarea and the Markdown preview pick it up automatically — no JS duplication. Saved to `localStorage`.
+
+The implementation is a single `input[type="range"]` whose `input` event calls:
+```js
+document.documentElement.style.setProperty('--font-size', `${val}px`);
+localStorage.setItem('junk-font-size', val);
+```
+No JS selects individual elements — the CSS `var(--font-size)` cascades to both the `<textarea>` and the `#md-preview` div automatically. On load, the saved value (default: `18`) is applied before the first paint to avoid a flash of unstyled text.
 
 ### Appearance (dark mode)
 
@@ -203,15 +219,23 @@ Three options: **Light**, **Auto**, **Dark**.
 
 Implemented via CSS custom properties on `:root[data-theme="dark"]`. Every colour, shadow, and blur value has a dark-mode override — the frosted glass deepens to `rgba(30,30,35,0.88)`.
 
+Auto mode attaches a `MediaQueryList.addEventListener('change', ...)` listener that fires synchronously when the OS switches colour schemes — no restart, no page reload. When switching from Auto to Light or Dark, the listener is explicitly removed to avoid memory leaks and double-firing. The listener reference is stored in a module-scoped variable `autoThemeListener` and torn down before being reassigned.
+
 ### Markdown preview
 
 Toggle with **⌘M** / **Ctrl+M**, the footer button, or the toggle in Preferences. When on, the textarea hides and a rendered `#md-preview` div appears. Raw text is always stored in `localStorage` — the preview is render-only.
 
 The inline parser handles: h1/h2/h3, **bold**, _italic_, `code`, fenced code blocks, blockquotes, HR, unordered/ordered lists, `[links](url)`. No external library — ~80 lines of vanilla JS.
 
+Switching back from preview to edit mode re-populates the textarea from `localStorage` — the content is never lost and the cursor is repositioned to the end of the text. All keyboard shortcuts (`⌘A`, `⌘Z`, `⌘V`) work normally in edit mode.
+
 ### Export
 
 Copies all content to the clipboard via `navigator.clipboard.writeText()`. Available from the footer copy button and the Preferences "Copy all text" button.
+
+The copy button shows a checkmark SVG icon and the label "Copied!" for 1.5 seconds, then reverts to the original clipboard icon. This feedback was added in v3.0.1 — prior versions used a static clipboard SVG with no state change, making it unclear whether the copy had succeeded. The feedback is implemented as a simple `setTimeout` that swaps two inline SVG paths and reverts.
+
+Export always copies raw text — even when Markdown preview is active, the raw Markdown source is exported, not the rendered HTML.
 
 ### Credits
 
@@ -303,7 +327,7 @@ Key differentiators: no blur-hide, no Dock/Taskbar entry, always on top, and one
 
 **Local data:** Your text lives on your machine only. Never sent anywhere.
 
-**Code audit:** `src-tauri/src/main.rs` is ~620 lines. The entire frontend is one HTML file (~1,500 lines). MIT-licensed, fully public — [read the source](https://github.com/paulfxyz/junk).
+**Code audit:** `src-tauri/src/main.rs` is ~700 lines. The entire frontend is one HTML file (~1,500 lines). MIT-licensed, fully public — [read the source](https://github.com/paulfxyz/junk).
 
 <details>
 <summary><strong>Tauri capability permissions (minimal surface area)</strong></summary>
@@ -319,6 +343,8 @@ Key differentiators: no blur-hide, no Dock/Taskbar entry, always on top, and one
     "core:window:allow-start-dragging",
     "core:window:allow-outer-position",
     "core:window:allow-set-position",
+    "core:window:allow-inner-size",
+    "core:window:allow-set-size",
     "core:webview:allow-set-webview-focus",
     "global-shortcut:allow-register",
     "global-shortcut:allow-unregister",
@@ -332,6 +358,10 @@ Key differentiators: no blur-hide, no Dock/Taskbar entry, always on top, and one
 ```
 
 Notably absent: filesystem access, clipboard API (browser `paste` events need no permission), notifications, camera, microphone, arbitrary network access beyond the GitHub API.
+
+The Tauri capability system is additive — every permission listed here is explicitly required. The `core:default` bundle grants only basic IPC bootstrap functionality. Every window, webview, and plugin permission above it is individually declared. This means adding a new feature requires a conscious permission addition — there is no ambient over-permissioning.
+
+**Why `core:window:allow-inner-size` and `core:window:allow-set-size`?** Added in v3.0.1 for window size memory. Reads the current window dimensions before saving position, and restores them on next focus. Both permissions were absent in v3.0.0 and caused silent IPC failures when size memory was first implemented.
 
 </details>
 
@@ -351,7 +381,9 @@ Every design decision traces back to this constraint:
 
 **Stay visible when needed.** When Junk is on screen, it floats above everything. It doesn't hide when you click away. You can look at Safari, look at Junk, copy from Safari, paste into Junk — without the window ever disappearing.
 
-**Plain text, always.** No markdown rendering, no rich text, no formatting toolbar. Formatting is a cognitive tax on the writing process. Junk is for the thought, not its presentation.
+**Plain text, always.** No rich text, no formatting toolbar. Formatting is a cognitive tax on the writing process. Junk is for the thought, not its presentation. Markdown preview exists for those who want to render their notes — but raw text is always the source of truth.
+
+**Native quality.** Frosted glass, rounded corners clipped at the OS compositor level, native window shadows, native drag behaviour — these aren't decoration. They signal to the user "this belongs here, on this OS". A tool you use dozens of times a day should feel native.
 
 ---
 
@@ -374,6 +406,16 @@ Junk started as an Electron app (v1.0.0–v1.5.0). The Rust/Tauri rewrite delive
 The binary ships as a single ~4 MB file with no external runtime. Startup time is imperceptible — the window appears before the user's finger lifts off the key.
 
 Tauri v2 uses the OS's native WebView (WKWebView on macOS, WebView2 on Windows, WebKitGTK on Linux) rather than bundling Chromium. This is the primary reason for the size and RAM difference: we're sharing the WebView engine with the browser already running on the user's machine.
+
+**Why not Electron still?** Three reasons beyond size and performance:
+
+1. **No runtime requirement.** Electron bundles Node.js. Every user needs a compatible Node environment embedded in the binary. Tauri's Rust binary has zero external dependencies — it runs on any supported OS with no prerequisites.
+
+2. **System WebView.** On macOS, WKWebView is the same engine as Safari — a first-class citizen of the OS. It gets security patches automatically via macOS updates. An Electron app bundles a specific Chromium version and requires manual updates to get security fixes.
+
+3. **Capability sandboxing.** Tauri v2's capability system requires explicit permission declarations for every OS API surface the app uses. There is no ambient "full OS access" like Node.js's `require('fs')`. The attack surface is minimal and auditable.
+
+**Why not a pure native Swift/ObjC app?** Cross-platform. A Swift app would need a complete Windows and Linux rewrite. A Rust + Tauri app shares the backend logic across all three platforms. The platform-specific code in `main.rs` is less than 20 lines of `#[cfg(target_os)]` — the rest is identical.
 
 </details>
 
@@ -599,6 +641,222 @@ With `e.preventDefault()`:
 </details>
 
 <details>
+<summary><strong>macOS rounded corners: the full investigation (v3.0.2 → v3.0.3)</strong></summary>
+
+Getting true OS-level rounded corners on a transparent frameless Tauri window on macOS was a three-attempt investigation that exposed the compositor layer hierarchy of WKWebView.
+
+### Attempt 1: CSS `border-radius` on `html, body` — FAILED
+
+The most obvious approach: apply `border-radius: 14px` to the root HTML element.
+
+```css
+html, body {
+  border-radius: 14px;
+  overflow: hidden;
+}
+```
+
+**What happened:** The CSS rounded the painted content in the WebView, but the WKWebView itself still occupied a full rectangular frame. On a transparent window, you see the rounded CSS content — but the WKWebView renders in a separate compositor layer managed by the OS. The corner pixels of the WebView were transparent (correctly, because the CSS `background` was clipped), but the `backdrop-filter: blur()` still operated on the full rectangle, producing an unclipped blur with square corners.
+
+**Root cause:** CSS cannot clip the WKWebView at the OS compositor level. WebKit renders the WKWebView in a separate CALayer (Core Animation layer) subtree that sits above the OS compositor. CSS `border-radius` clips the rendered CSS content but does not instruct the CALayer to mask its compositing bounds. The blur samples pixels from the layers below — the blur layer itself is square even if its CSS content appears rounded.
+
+**Result:** The frosted glass had square corners. The visual result was worse than no rounding at all, because the sharp square blur looked intentional.
+
+### Attempt 2: `window-vibrancy` crate with `NSVisualEffectView.cornerRadius` — PARTIALLY WORKED
+
+The `window-vibrancy` crate provides a `apply_vibrancy()` function for macOS frosted glass. Reading the crate's source on crates.io reveals the implementation: it creates an `NSVisualEffectView` as a subview of the window's `contentView` and calls `setCornerRadius()` on that subview.
+
+```rust
+// From window-vibrancy source — simplified
+let visual_effect_view = NSVisualEffectView::new(mtm);
+visual_effect_view.setMaterial(NSVisualEffectMaterial::HudWindow);
+visual_effect_view.setCornerRadius(14.0);  // rounds the blur subview
+content_view.addSubview(&visual_effect_view);
+```
+
+**What happened:** The frosted glass blur appeared. The blur subview's corners were rounded. But the WKWebView still rendered as a full square above the blur layer.
+
+**Why partial:** `setCornerRadius()` on `NSVisualEffectView` rounds the blur *subview's* rendering — the subview's own CALayer clips its blur effect. But `NSVisualEffectView` is a subview added to the `contentView`; the WKWebView is a *sibling* (or child) of that `contentView`. The NSWindow frame itself is still rectangular. The WKWebView renders above the blur layer in its own full-size square layer, un-clipped.
+
+**Visual result:** A frosted glass window with rounded blur corners *visible in the corners where the WKWebView was transparent* — but the WKWebView's background (even if `rgba(0,0,0,0)`) still occupied a rectangle that blocked the OS compositor from seeing through to the corners properly. The result was slightly rounded blur but square content.
+
+### Root cause discovered: reading `window-vibrancy` source
+
+The key insight came from reading the `window-vibrancy` source directly. `apply_vibrancy()` operates on an `NSVisualEffectView` subview. It never touches the `contentView`'s own CALayer. The `contentView` CALayer is the root layer — it clips everything, including WKWebView — but its `cornerRadius` and `masksToBounds` are left at their defaults (`0` and `NO`).
+
+`masksToBounds = NO` on the root contentView CALayer means the compositing layer tree is not clipped to the window's frame shape. Every subview (including WKWebView) renders its full extent, unclipped.
+
+The solution must operate on the `contentView`'s CALayer directly.
+
+### Solution (v3.0.3): Two-step approach
+
+**Step 1:** Call `apply_vibrancy()` for frosted-glass background material.
+
+**Step 2:** Call a custom `set_macos_window_corner_radius()` function that walks up to the `contentView`'s CALayer and sets both `cornerRadius` and `masksToBounds`:
+
+```rust
+use objc2::msg_send;
+use objc2::runtime::AnyObject;
+use objc2_app_kit::{NSView, NSWindow};
+use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+
+/// Set rounded corners on the macOS window at the OS compositor level.
+///
+/// This works by setting cornerRadius + masksToBounds = YES on the root
+/// contentView CALayer. masksToBounds clips the ENTIRE compositor subtree —
+/// including WKWebView — at the OS level. CSS border-radius cannot do this.
+///
+/// Must be called AFTER apply_vibrancy() — vibrancy sets up the NSVisualEffectView
+/// subview hierarchy that we want to clip along with everything else.
+fn set_macos_window_corner_radius(window: &WebviewWindow, radius: f64) -> Result<(), String> {
+    let handle = window
+        .window_handle()
+        .map_err(|e| e.to_string())?;
+
+    let ns_view = match handle.as_raw() {
+        RawWindowHandle::AppKit(h) => h.ns_view.as_ptr() as *mut AnyObject,
+        _ => return Err("not an AppKit window".into()),
+    };
+
+    unsafe {
+        // ns_view → NSWindow → contentView → CALayer
+        let ns_window: *mut AnyObject = msg_send![ns_view, window];
+        let content_view: *mut AnyObject = msg_send![ns_window, contentView];
+        let layer: *mut AnyObject = msg_send![content_view, layer];
+
+        // cornerRadius: clips the layer's rendered output to a rounded rect
+        let _: () = msg_send![layer, setCornerRadius: radius];
+
+        // masksToBounds = YES: the key line.
+        // Forces the CALayer to clip ALL child layers (including WKWebView)
+        // to the layer's own bounds + cornerRadius shape.
+        // Without this, cornerRadius only rounds the layer's own drawing —
+        // child layers render unconstrained and appear above the rounded clip.
+        let _: () = msg_send![layer, setMasksToBounds: true];
+    }
+
+    Ok(())
+}
+```
+
+**Why `masksToBounds = YES` is the key:**
+
+CALayer's `cornerRadius` property rounds the layer's *own* drawing (its background colour, border, etc.). But child layers are not clipped unless `masksToBounds` is `YES`. With `masksToBounds = YES`, the CALayer creates a mask in the shape of its bounds + cornerRadius and clips the *entire compositor subtree* — including all child layers (WKWebView and NSVisualEffectView) — to that shape.
+
+This is an OS compositor operation: it happens below the WebKit rendering pipeline. No CSS, no JS, and no WebKit drawing code can see past it. The result is a true hardware-clipped rounded window.
+
+### Dependencies
+
+All three crates were already transitive dependencies of `window-vibrancy` — declared explicitly in `Cargo.toml` for direct use:
+
+```toml
+[dependencies]
+window-vibrancy = "0.5"
+objc2 = "0.6.0"
+objc2-app-kit = { version = "0.3.0", features = ["NSView", "NSWindow"] }
+raw-window-handle = "0.6"
+```
+
+No new transitive dependencies were added. The total binary size impact of the explicit declarations is zero — these crates were already compiled as part of `window-vibrancy`.
+
+### Setup call sequence in `main.rs`
+
+```rust
+// In the Tauri setup hook, after the window is created:
+#[cfg(target_os = "macos")]
+{
+    use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
+    apply_vibrancy(&window, NSVisualEffectMaterial::HudWindow, None, None)
+        .expect("apply_vibrancy failed");
+
+    // Must come AFTER apply_vibrancy — rounds the entire compositor stack
+    set_macos_window_corner_radius(&window, 14.0)
+        .expect("set_macos_window_corner_radius failed");
+}
+```
+
+The `#[cfg(target_os = "macos")]` guard is critical — `objc2` and `objc2-app-kit` are macOS-only. The function must not be compiled or called on Windows or Linux.
+
+</details>
+
+<details>
+<summary><strong>macOS window shadow (v3.0.4)</strong></summary>
+
+### The problem: `box-shadow` doesn't work on masked windows
+
+After v3.0.3 added `masksToBounds = YES` to the contentView's CALayer, the existing CSS `box-shadow` stopped casting a shadow. The cause: `masksToBounds = YES` clips the *entire compositor subtree* to the layer's bounds — including any shadows that CSS tried to draw outside those bounds.
+
+```css
+/* This works on unmasked windows, but is clipped by masksToBounds = YES */
+box-shadow:
+  0 32px 80px rgba(0, 0, 0, 0.22),
+  0 8px 24px rgba(0, 0, 0, 0.12);
+```
+
+The `box-shadow` is rendered as part of the WebKit compositor layer. With `masksToBounds = YES` on the parent contentView CALayer, any drawing that extends outside the layer's bounding rect — including drop shadows — is clipped. The result is a crisp, rounded window with no shadow.
+
+### Attempt: CSS `box-shadow` via a wrapper element
+
+One approach would be to create a separate DOM element positioned behind the window content but outside the masked layer. This is complex, fragile, and doesn't integrate with macOS's window stacking and depth system.
+
+### Solution: `"shadow": true` in `tauri.conf.json` (v3.0.4)
+
+macOS's WindowServer draws native drop shadows *outside* the window frame — below the compositor layer where `masksToBounds` operates. The WindowServer shadow is not a WebKit drawing; it's a system-level effect applied by the compositor to the entire window frame.
+
+```json
+{
+  "app": {
+    "windows": [
+      {
+        "shadow": true,
+        ...
+      }
+    ]
+  }
+}
+```
+
+One line. Zero Rust code. The result:
+
+- WindowServer draws a native drop shadow below and around the window frame
+- The shadow adapts automatically to window depth (how high the window is above others)
+- The shadow adapts to dark mode — darker in light mode, subtler in dark mode
+- The shadow updates as the window moves, resizes, or changes z-order
+- The shadow is drawn *below* the `masksToBounds` clip — it is never clipped
+
+This is exactly the same shadow mechanism used by every macOS native app. It looks indistinguishable from a native window shadow because it *is* the native window shadow.
+
+### What CSS `box-shadow` does now
+
+With the native shadow providing depth, the CSS `box-shadow` is now reduced to a single crisp edge ring:
+
+```css
+box-shadow:
+  inset 0 -1px 0 rgba(0, 0, 0, 0.06),       /* inner bottom rim — glass edge */
+  inset 0 1px 0 rgba(255, 255, 255, 0.90),  /* specular top highlight */
+  0 0 0 0.5px rgba(0, 0, 0, 0.15);          /* crisp edge ring — visible on white bg */
+```
+
+The `0.5px` edge ring is subpixel — on Retina displays it renders as a half-pixel border. This is only visible when Junk is positioned over a white or light background; on dark wallpapers the edge is invisible. Its purpose is to define the window boundary precisely when the backdrop blur blends into a similarly-coloured background.
+
+The two inset shadows (bottom rim and top highlight) simulate physical glass catching light. They are not clipped by `masksToBounds` because they are *inset* — they draw inside the layer's bounds, not outside.
+
+### Shadow in dark mode
+
+The native WindowServer shadow automatically reduces its opacity in dark mode — macOS reduces shadow intensity system-wide in dark mode to preserve contrast. The CSS edge ring has a dark-mode override:
+
+```css
+:root[data-theme="dark"] .window {
+  box-shadow:
+    inset 0 -1px 0 rgba(0, 0, 0, 0.20),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 0.5px rgba(255, 255, 255, 0.08);  /* light edge ring on dark bg */
+}
+```
+
+</details>
+
+<details>
 <summary><strong>Process persistence</strong> (why Junk never exits)</summary>
 
 The global shortcut (`⌘J`) is registered in the Rust process. If the process exits, the shortcut unregisters — and the user has no way to restart it without a Dock icon or menu bar entry to indicate the app is gone.
@@ -630,6 +888,8 @@ Making the process persistent means the shortcut works from first launch until t
 ```
 
 This is the same architectural pattern used by Alfred, Paste, Magnet, and Raycast. They all hide; they never accidentally quit.
+
+**Why not intercept ⌘Q?** Junk v2.3.0 through v2.5.0 (when there was a system tray) intercepted `ExitRequested` and hid instead of quitting. After the tray was removed in v2.6.0, intercepting ⌘Q created a trap: the user typed ⌘Q, nothing happened, and there was no UI to indicate the app was still running. From v2.6.0 onwards, ⌘Q quits for real — the only way to keep the process alive is to not press ⌘Q. Activity Monitor is the escape hatch for users who want to truly kill it without quitting.
 
 </details>
 
@@ -671,6 +931,20 @@ let modifiers = Modifiers::CONTROL;
 This was a real bug in early versions — `SUPER | CONTROL` compiled fine but produced a chord shortcut that no one could trigger.
 
 **The Esc edge case:** Registering bare `Escape` (no modifier) as a global shortcut is unusual — most apps don't do this because the macOS Carbon hotkey API doesn't natively support modifier-less keys. `tauri-plugin-global-shortcut` handles this via a different code path, which is why it works.
+
+**Custom shortcut registration flow (v3.0.0+):**
+
+When the user changes the shortcut in Preferences:
+
+```
+JS: keydown → e.code (e.g. "KeyK") → ipc('set_hotkey', { key: 'KeyK' })
+Rust: parse_key_code("KeyK") → Code::KeyK
+      gs.unregister(current_shortcut)  // explicit — no auto-deregistration on drop
+      gs.on_shortcut(new_shortcut, toggle_fn)
+      *state.lock() = new_shortcut
+```
+
+`Shortcut` objects are not automatically deregistered when dropped — the OS hotkey registration is a side effect that persists until explicitly cancelled. This means if you register a new shortcut without unregistering the old one, both fire simultaneously. The `CurrentShortcut(Mutex<Shortcut>)` managed state holds the currently-registered shortcut so the old registration can be found and cancelled before the new one is created.
 
 </details>
 
@@ -716,6 +990,8 @@ async function ipc(command, args = {}) {
 
 Why lazy resolution? `<script type="module">` defers execution until after DOM parsing. On some WKWebView builds, `window.__TAURI_INTERNALS__` is injected asynchronously — capturing it once at module load can freeze a `null` reference. Resolving at call time means every invocation gets the current, post-injection value.
 
+**The website frontend is a separate codebase.** The app frontend (`src/index.html`) is the window that appears when you press ⌘J. The landing page at [thejunk.app](https://thejunk.app) is a separate HTML/CSS/JS file deployed via FTP to SiteGround. They share no code. The landing page uses cache-busted filenames (`style.v304.css`, `app.v304.js`) so that CDN-cached HTML doesn't serve stale assets. See the SiteGround CDN section below for the full explanation.
+
 </details>
 
 <details>
@@ -758,12 +1034,21 @@ ipc('get_window_position')            →  window.outer_position()
 ipc('set_window_position', {x, y})    →  window.set_position(
                                            PhysicalPosition::new(x, y)
                                          )
+
+─── v3.0.1 additions ────────────────────────────────────────────────────────────
+ipc('get_window_size')                →  window.inner_size()
+                                         returns WindowSize { width: u32, height: u32 }
+
+ipc('set_window_size',                →  window.set_size(
+     { width: u32, height: u32 })          PhysicalSize::new(width, height)
+                                         )
 ─────────────────────────────────────────────────────────────────────────────
 
 Rust → JS events (via window.emit / Tauri event system)
 ─────────────────────────────────────────────────────────────────────────────
 "tauri://focus"   →  triggerFlyIn() + setTimeout(focusEditor, 20ms)
                      + restoreWindowPosition()  ← new in v3.0.0
+                     + restoreWindowSize()      ← new in v3.0.1
 "open-prefs"      →  openPrefs() — reads OS state fresh on every open
 ```
 
@@ -893,17 +1178,35 @@ backdrop-filter: blur(40px) saturate(180%);
 border: 1px solid rgba(255, 255, 255, 0.60);
 border-radius: 14px;
 box-shadow:
-  0 32px 80px rgba(0, 0, 0, 0.22),          /* ambient float — main depth */
-  0 8px 24px rgba(0, 0, 0, 0.12),           /* mid-range depth */
   inset 0 -1px 0 rgba(0, 0, 0, 0.06),       /* inner bottom rim — glass edge */
-  inset 0 1px 0 rgba(255, 255, 255, 0.90);  /* specular top highlight */
+  inset 0 1px 0 rgba(255, 255, 255, 0.90),  /* specular top highlight */
+  0 0 0 0.5px rgba(0, 0, 0, 0.15);          /* crisp edge ring */
 ```
 
 `backdrop-filter` composites the blurred background from the pixels _behind_ the window — it requires `transparent: true` in `tauri.conf.json` so the OS compositor can supply those pixels to the WebView. The specular top inset shadow creates the perception of a physical glass surface catching light from above.
 
 On older Linux setups without compositor support, `backdrop-filter` silently degrades to the `rgba(255,255,255,0.72)` background. The window remains fully functional and readable — just not glassy.
 
-The four-layer box-shadow is the visual trick that makes Junk look like a real floating object rather than a flat rectangle. Each layer solves a different depth problem: the wide ambient shadow provides the floating sensation, the tighter shadow defines the edges, the inner bottom rim suggests physical thickness, and the top specular highlight completes the glass illusion.
+**Dark mode frosted glass:**
+
+```css
+:root[data-theme="dark"] .window {
+  background: rgba(30, 30, 35, 0.88);
+  backdrop-filter: blur(40px) saturate(160%);
+  -webkit-backdrop-filter: blur(40px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow:
+    inset 0 -1px 0 rgba(0, 0, 0, 0.20),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 0.5px rgba(255, 255, 255, 0.08);
+}
+```
+
+The dark glass uses a higher opacity (`0.88` vs `0.72`) because dark backgrounds need more contrast to remain legible. The saturation is slightly reduced (`160%` vs `180%`) because over-saturated dark backgrounds look neon. The border changes from a white glow to a subtle white outline at low opacity — enough to define the edge without being glary.
+
+**Note on `box-shadow` vs native shadow (v3.0.4):**
+
+The original `box-shadow` stack included large ambient drop shadows (`0 32px 80px rgba(0,0,0,0.22)`). These were removed in v3.0.3 when `masksToBounds = YES` began clipping them. In v3.0.4, drop shadow is provided by the native WindowServer shadow (`"shadow": true` in `tauri.conf.json`) which operates below the clip. The CSS `box-shadow` is now only the two inset glass highlights and the `0.5px` edge ring.
 
 </details>
 
@@ -999,6 +1302,174 @@ The toggle in Preferences reads `is_enabled()` fresh on every panel open — so 
 </details>
 
 <details>
+<summary><strong>Window position + size memory (v3.0.1)</strong></summary>
+
+### Two new IPC commands
+
+```rust
+#[tauri::command]
+fn get_window_size(window: WebviewWindow) -> Result<WindowSize, String> {
+    let size = window.inner_size().map_err(|e| e.to_string())?;
+    Ok(WindowSize { width: size.width, height: size.height })
+}
+
+#[tauri::command]
+fn set_window_size(
+    window: WebviewWindow,
+    width: u32,
+    height: u32,
+) -> Result<(), String> {
+    window
+        .set_size(tauri::PhysicalSize::new(width, height))
+        .map_err(|e| e.to_string())
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct WindowSize {
+    width: u32,
+    height: u32,
+}
+```
+
+Two new capability permissions added to `capabilities/default.json`:
+- `core:window:allow-inner-size`
+- `core:window:allow-set-size`
+
+### JS save flow
+
+```js
+// On mouseup after any drag — save both position AND size
+windowEl.addEventListener('mouseup', async () => {
+  // 80ms delay: OS commits final window position asynchronously.
+  // Without this, outer_position() returns the pre-drag position on macOS.
+  await new Promise(r => setTimeout(r, 80));
+
+  const pos = await ipc('get_window_position');
+  const size = await ipc('get_window_size');
+
+  if (pos) {
+    localStorage.setItem('junk-win-x', pos.x);
+    localStorage.setItem('junk-win-y', pos.y);
+  }
+  if (size) {
+    localStorage.setItem('junk-win-w', size.width);
+    localStorage.setItem('junk-win-h', size.height);
+  }
+});
+
+// Also save on window resize (resize handle drag)
+window.addEventListener('resize', debounce(async () => {
+  const size = await ipc('get_window_size');
+  if (size) {
+    localStorage.setItem('junk-win-w', size.width);
+    localStorage.setItem('junk-win-h', size.height);
+  }
+}, 200));
+```
+
+### JS restore flow
+
+```js
+// On tauri://focus — restore position and size on every show
+async function restoreWindowGeometry() {
+  const x = parseInt(localStorage.getItem('junk-win-x'));
+  const y = parseInt(localStorage.getItem('junk-win-y'));
+  const w = parseInt(localStorage.getItem('junk-win-w'));
+  const h = parseInt(localStorage.getItem('junk-win-h'));
+
+  // Off-screen guard: discard positions that are clearly off-monitor
+  // Handles: monitor unplugged, resolution change, multi-monitor rearrangement
+  const isOffScreen = (
+    isNaN(x) || isNaN(y) ||
+    x < -100 || y < -100 ||
+    x > screen.width + 200 ||
+    y > screen.height + 200
+  );
+
+  if (!isOffScreen) {
+    await ipc('set_window_position', { x, y });
+  }
+
+  // Size restore is separate — never guard on size (no "off-screen" equivalent)
+  if (!isNaN(w) && !isNaN(h) && w > 100 && h > 60) {
+    await ipc('set_window_size', { width: w, height: h });
+  }
+}
+```
+
+### Why `tauri://focus` and not startup?
+
+Restoring position on startup fails on macOS because `outer_position()` and `set_position()` are not reliable before the window has been shown and the OS compositor has committed the window frame. The `tauri://focus` event fires after `window.show()` — the window is visible and the OS has committed its frame. Position and size changes at this point are atomic from the user's perspective (before the window appears on screen) because the fly-in animation runs simultaneously.
+
+### The 80ms delay explained
+
+macOS's Quartz Compositor commits window frame changes asynchronously. When a drag ends (`mouseup`), the OS WindowServer has not yet finalised the window's position in its own data structures — it's still processing the drag end event. Calling `outer_position()` immediately on `mouseup` often returns the window's position from a few frames before the drag ended.
+
+The 80ms delay (measured empirically on multiple machines and macOS versions) reliably gives the OS enough time to commit the final position before we read it back. A longer delay (200ms) also works but produces a perceptible lag in position-saving that can cause the window to not save its final position if the user quickly hides it after dragging.
+
+</details>
+
+<details>
+<summary><strong>The SiteGround CDN cache problem (thejunk.app deployment)</strong></summary>
+
+The landing page at [thejunk.app](https://thejunk.app) is deployed to SiteGround shared hosting via FTP. SiteGround runs a CDN in front of the shared hosting — it caches responses to reduce server load. This CDN layer caused two classes of deployment problems.
+
+### Problem 1: Uploading `index.html` doesn't update the site
+
+SiteGround's CDN caches `https://thejunk.app/` (the root URL — the directory index) separately from `https://thejunk.app/index.html` (the explicit file URL). When you upload a new `index.html` via FTP:
+
+- `https://thejunk.app/index.html` — immediately serves the new file (CDN has a cache miss, fetches from origin)
+- `https://thejunk.app/` — **still serves the old cached response** until the CDN TTL expires (typically 1–24 hours)
+
+Since virtually all visitors hit the root URL, a deployed update is invisible for hours.
+
+### Workaround 1: `.htaccess` 302 redirect
+
+```apache
+# .htaccess — redirect root to explicit index.html
+RewriteEngine On
+RewriteRule ^$ /index.html [R=302,L]
+```
+
+This forces the CDN to issue a separate cache entry for `/index.html` (which busts on upload) rather than caching the root response. Visitors hitting `https://thejunk.app/` get a `302 → /index.html` — the redirect itself is cacheable but the destination file gets the fresh upload immediately.
+
+A `302` (temporary redirect) rather than `301` (permanent redirect) is deliberate — browsers cache `301` responses indefinitely, meaning a user who visited once would follow the stale cached `301` forever. `302` instructs the browser to re-check each time.
+
+### Problem 2: Stale JS/CSS even with fresh HTML
+
+Even after solving the root URL cache problem, a second issue emerged: the browser had cached `style.css` and `app.js` from a previous visit. The HTML was fresh but referenced the same filenames — the browser served the old cached assets from its local cache.
+
+### Workaround 2: Cache-busted asset filenames
+
+Instead of `style.css` and `app.js`, version-specific names are used:
+
+```html
+<!-- Old — cached forever by browsers -->
+<link rel="stylesheet" href="style.css">
+<script src="app.js"></script>
+
+<!-- New — new filename = new cache entry -->
+<link rel="stylesheet" href="style.v304.css">
+<script src="app.v304.js"></script>
+```
+
+Every release bumps the version suffix in the filename. Since browsers have never requested `style.v304.css` before, there is no cached entry — the asset is fetched fresh. The old `style.v303.css` remains on the server (no cleanup needed — it's 10 KB).
+
+This technique works even if the old `index.html` is still being served from the CDN — the old HTML references `style.v303.css` (still on the server), and the new HTML references `style.v304.css` (also on the server). Both serve correctly. The CDN transitions are seamless.
+
+### Why not use SiteGround's cache purge tool?
+
+SiteGround's cPanel provides a "Purge Cache" button for the CDN. We tried this — it clears the CDN cache for cached URLs, but in practice the CDN would re-cache the root URL from the origin within seconds of the next request (before we could verify the update was live). The race condition made it unreliable as a deployment step.
+
+The `.htaccess` + version-suffix approach is deterministic and requires no manual steps after FTP upload.
+
+### Lesson
+
+CDN caching for directory indexes (root URLs) is a silent failure mode that doesn't affect development (localhost has no CDN) and doesn't affect testing via explicit file paths (`/index.html`). It only manifests in production, under the root URL, with a delay. The combination of `.htaccess` redirect + versioned filenames provides complete CDN-cache independence for deployments.
+
+</details>
+
+<details>
 <summary><strong>Dependency tree</strong></summary>
 
 ```
@@ -1021,12 +1492,22 @@ junk (Rust binary)
 ├── tauri-plugin-http 2.x              ← Rust HTTP (rustls-tls feature)
 │   └── reqwest (re-export, no `json` feature) ← fetch GitHub API from Rust
 │
+├── window-vibrancy 0.5                ← macOS NSVisualEffectView frosted glass
+│   └── (brings objc2, objc2-app-kit, raw-window-handle as transitives)
+│
+├── objc2 0.6.0                        ← ObjC runtime bindings (explicit — for CALayer)
+├── objc2-app-kit 0.3.0                ← NSView + NSWindow Rust bindings
+│   features: ["NSView", "NSWindow"]
+├── raw-window-handle 0.6              ← Platform window handle extraction
+│
 ├── serde + serde_json 1.x             ← IPC serialisation (Serialize/Deserialize)
 ├── log 0.4                            ← Structured logging facade
 └── env_logger 0.11                    ← RUST_LOG-driven log subscriber (debug builds)
 ```
 
 **Frontend:** zero runtime dependencies. The only external load is [Space Grotesk](https://fonts.google.com/specimen/Space+Grotesk) from Google Fonts, cached permanently after first launch.
+
+**Why `objc2` and not `objc` (the older crate)?** `objc` is the original Objective-C runtime binding crate for Rust. `objc2` is the community-maintained successor with safer bindings, better type checking, and active maintenance. `window-vibrancy` already uses `objc2` — declaring it explicitly aligns our direct usage with the version already in the dependency tree, avoiding version conflicts.
 
 </details>
 
@@ -1040,11 +1521,11 @@ junk/
 │   └── index.html           ← Entire frontend: HTML + CSS + JS, single file, no build step
 ├── src-tauri/
 │   ├── src/
-│   │   └── main.rs          ← ~620 lines, all Rust backend logic, heavily commented
+│   │   └── main.rs          ← ~700 lines, all Rust backend logic, heavily commented
 │   ├── capabilities/
 │   │   └── default.json     ← Tauri permission allowlist (minimal surface area)
 │   ├── Cargo.toml           ← Rust dependencies + build profile (LTO, strip, panic=abort)
-│   └── tauri.conf.json      ← App config: frameless, transparent, withGlobalTauri: true
+│   └── tauri.conf.json      ← App config: frameless, transparent, shadow, withGlobalTauri: true
 ├── .github/
 │   └── workflows/
 │       └── build.yml        ← CI: 3-platform matrix build → GitHub Release
@@ -1130,9 +1611,9 @@ Every push to a `v*` tag triggers the GitHub Actions workflow — a 3-platform m
 
 | Runner | Artifacts |
 |---|---|
-| macOS | `Junk_3.0.0_universal.dmg` |
-| Windows | `Junk_3.0.0_x64-setup.exe` + `Junk_3.0.0_x64_en-US.msi` |
-| Ubuntu | `Junk_3.0.0_amd64.AppImage` + `Junk_3.0.0_amd64.deb` |
+| macOS | `Junk_3.0.4_universal.dmg` |
+| Windows | `Junk_3.0.4_x64-setup.exe` + `Junk_3.0.4_x64_en-US.msi` |
+| Ubuntu | `Junk_3.0.4_amd64.AppImage` + `Junk_3.0.4_amd64.deb` |
 
 All artifacts are uploaded to a GitHub Release and auto-published with a git log changelog.
 
@@ -1158,6 +1639,11 @@ The release job only runs on `v*` tag pushes — not on branch pushes or PRs. It
 | Runtime hotkey re-registration silently fires both old and new shortcut | Registered `Shortcut` objects are not auto-deregistered on drop | Hold old `Shortcut` in `CurrentShortcut(Mutex<Shortcut>)` state; call `unregister` explicitly before registering new one |
 | `KeyboardEvent.key` ("j", "J") fails on non-QWERTY layouts for hotkey capture | `.key` is layout-dependent — produces wrong characters on AZERTY etc. | Use `KeyboardEvent.code` ("KeyJ") — physical key position, layout-independent |
 | `window.outer_position()` returns wrong coordinates after first show | WKWebView reports position before the OS compositor has committed the final frame | Restore position on `tauri://focus` event (not on startup) after 80 ms mouseup delay for save |
+| CSS `border-radius` doesn't clip WKWebView blur | WebKit renders WKWebView in a separate compositor layer above CSS | Set `masksToBounds = YES` on contentView CALayer via `objc2::msg_send!` |
+| `apply_vibrancy()` with `setCornerRadius` — corners still square on content | `NSVisualEffectView.cornerRadius` only rounds blur subview, not the window frame | Additionally call `set_macos_window_corner_radius()` to set CALayer masksToBounds |
+| CSS `box-shadow` clipped after adding `masksToBounds = YES` | `masksToBounds` clips everything drawn outside the layer bounds, including shadows | Use `"shadow": true` in `tauri.conf.json` — native WindowServer shadow operates below the clip |
+| SiteGround CDN caches root URL separately from index.html | CDN treats `/` and `/index.html` as distinct cache entries | Use `.htaccess` 302 redirect from `/` to `/index.html` + versioned asset filenames |
+| `objc2::msg_send!` macro syntax differs between objc2 versions | Breaking API change in objc2 0.5 → 0.6 | Match the version used by `window-vibrancy` (currently 0.6) — check transitive dep tree |
 
 </details>
 
@@ -1204,9 +1690,56 @@ It sits at the intersection of technical precision and warmth. The squared termi
 **Q: Can I use multiple Junk windows?**
 No. One window, one scratchpad. This is a design constraint: multiple windows reintroduce the "which one does this go in" decision that Junk exists to eliminate.
 
+**Q: The window appears in a different position than where I left it.**
+This can happen if you've unplugged an external monitor or changed your display resolution since the last session. The off-screen guard detects positions outside the current screen bounds and discards them, which means the window reverts to its default position. Drag it back to where you want it and it will remember the new position.
+
+**Q: How does the rounded-corner macOS implementation work?**
+See the "macOS rounded corners: the full investigation" section in Architecture above. The short version: CSS `border-radius` can't clip WKWebView at the compositor level. The solution is setting `cornerRadius` + `masksToBounds = YES` directly on the `NSWindow contentView`'s `CALayer` via Objective-C runtime calls (`objc2::msg_send!`). This clips the entire compositor subtree — including WKWebView and NSVisualEffectView — at the OS level.
+
 ---
 
 ## Changelog
+
+### v3.0.4 — 2026-06-04
+
+Native macOS window shadow.
+
+- **macOS window shadow** — `"shadow": true` added to the `windows` array in `tauri.conf.json`. This instructs the macOS WindowServer to draw a native drop shadow around the window frame. The shadow is drawn *below* the compositor layer where `masksToBounds = YES` clips, so it is never clipped. It adapts automatically to: window depth (z-order relative to other windows), dark mode (dimmer in dark mode), window state (focused/unfocused), and movement.
+- **CSS `box-shadow` revised** — the large ambient drop shadows (`0 32px 80px rgba(0,0,0,0.22)`) removed (they were clipped by `masksToBounds = YES` since v3.0.3). The `box-shadow` now provides only: two inset glass highlights (top specular + bottom rim) and a `0.5px` edge ring for window boundary definition on white backgrounds.
+- **Dark mode shadow** — the CSS edge ring inverts in dark mode (becomes a subtle white glow at 8% opacity) to define the window boundary on dark wallpapers.
+
+---
+
+### v3.0.3 — 2026-06-04
+
+True macOS rounded corners via `objc2` CALayer `masksToBounds`.
+
+- **macOS rounded corners** — resolved after three attempts spanning v3.0.2. Final solution: `set_macos_window_corner_radius()` Rust function uses `objc2::msg_send!` to walk `nsView → [nsView window] → [window contentView] → CALayer`, then sets `layer.cornerRadius = 14.0` and `layer.masksToBounds = YES`. The `masksToBounds = YES` clips the entire compositor subtree (WKWebView, NSVisualEffectView, everything) at the OS level — not just CSS content. Called in the Tauri `setup` hook immediately after `apply_vibrancy()`.
+- **Dependencies** — `objc2 = "0.6.0"`, `objc2-app-kit = { version = "0.3.0", features = ["NSView", "NSWindow"] }`, `raw-window-handle = "0.6"` added to `Cargo.toml` as explicit direct dependencies (were already transitive via `window-vibrancy`).
+- **Bug** — Discovered that `apply_vibrancy()` alone (v3.0.2) only rounded the `NSVisualEffectView` subview's corner — not the window frame. WKWebView still rendered as a square above the blur. This version fixes the root issue.
+
+---
+
+### v3.0.2 — 2026-06-04
+
+`window-vibrancy` for macOS frosted glass (partial — corners still square at WKWebView level).
+
+- **macOS frosted glass** — `window-vibrancy = "0.5"` added. `apply_vibrancy(&window, NSVisualEffectMaterial::HudWindow, None, None)` called in setup hook. The `NSVisualEffectView` provides the system-native frosted glass blur behind the window. The `backdrop-filter` CSS approach continues to function in parallel (provides the blur sampling from behind-window pixels); the `NSVisualEffectView` adds depth and native vibrancy integration.
+- **Partial rounded corners** — `NSVisualEffectView.setCornerRadius(14.0)` was called but only rounded the blur subview. The WKWebView continued rendering as a full rectangle above it. True rounded corners were deferred to v3.0.3.
+- **Tauri config** — `"decorations": false` and `"transparent": true` confirmed required for `apply_vibrancy()` to work — it needs to be able to add the `NSVisualEffectView` as a subview behind the window's existing content.
+
+---
+
+### v3.0.1 — 2026-06-04
+
+Clipboard feedback, window size memory, preferences scroll fix.
+
+- **Clipboard feedback** — the footer copy button now shows a checkmark SVG icon and "Copied!" label for 1.5 s after a successful copy, then reverts to the clipboard icon. Previous behaviour was a silent copy with no visual confirmation.
+- **Window size memory** — two new IPC commands: `get_window_size` (reads `window.inner_size()`) and `set_window_size` (calls `window.set_size(PhysicalSize)`). JS saves both position and size on `mouseup` (80 ms delay) and on `resize` (200 ms debounce). Restored on `tauri://focus` alongside position. New capability permissions: `core:window:allow-inner-size` and `core:window:allow-set-size`.
+- **Preferences scroll fix** — the Preferences panel now has `overflow-y: auto` on the content area. On small screens or when font size is large, preferences content was clipping. The panel now scrolls independently of the window.
+- **IPC map updated** — `get_window_size` and `set_window_size` added to `invoke_handler![]`. Total IPC commands: 11.
+
+---
 
 ### v3.0.0 — 2026-06-04
 
@@ -1324,7 +1857,7 @@ Pull requests are welcome. A few conventions before opening one:
 
 ## Roadmap
 
-All v3.0.0 features are shipped. Possible future directions:
+All v3.0.4 features are shipped. Possible future directions:
 
 - **Multi-scratchpad** — named scratch buffers, switchable via shortcut
 - **Image paste** — capture and store a screenshot clip inside Junk
@@ -1342,7 +1875,7 @@ This app was built entirely through vibe coding using various AI tools — Rust 
 
 ## Author
 
-**Paul Fleury** — [paulfleury.com](https://paulfleury.com) · [GitHub @paulfxyz](https://github.com/paulfxyz)
+**Paul Fleury** — [LinkedIn](https://www.linkedin.com/in/paulfxyz/) · [GitHub @paulfxyz](https://github.com/paulfxyz)
 
 ---
 
