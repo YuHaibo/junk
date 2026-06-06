@@ -4,6 +4,23 @@ All notable changes to Junk are documented here. Format follows [Keep a Changelo
 
 ---
 
+## [3.0.7] — 2026-06-06
+
+### Revert broken footer changes; restore working state
+
+#### Fixed
+- Reverted all v3.0.5 and v3.0.6 footer changes (drag handle div, `.footer-drag-handle`
+  CSS, `position: relative` on `.footer`) — they broke Markdown toggle, clipboard copy,
+  and settings buttons by adding an absolutely-positioned overlay that interfered with
+  click events in multiple ways.
+- Footer drag (grabbing from the empty centre of the bottom bar) works as it did in
+  v3.0.4: the empty gap between `.footer-left` and `.footer-right` is the `<footer>`
+  element itself, which is not in the INTERACTIVE selector list, so mousedown bubbles
+  to `#window` and triggers `start_dragging()` normally.
+- All footer buttons (Markdown toggle, clipboard copy, settings gear) work correctly.
+
+---
+
 ## [3.0.6] — 2026-06-06
 
 ### Fix: footer buttons unblocked
