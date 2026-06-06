@@ -1,15 +1,16 @@
 <!DOCTYPE html>
 <!--
-  Junk — frontend (v3.0.4)
+  Junk — frontend (v3.0.9)
   ═══════════════════════════════════════════════════════════════════════════════
 
-  New in v3.0.0:
+  Features (current as of v3.0.9):
     1. Custom shortcut     — change ⌘J to any key via Preferences
-    2. Window position     — drag position remembered across sessions
+    2. Window position     — drag position + size remembered across sessions
     3. Font size           — 14–28px, saved in localStorage
     4. Dark mode           — auto (system) or manual light/dark toggle
     5. Markdown preview    — toggle rendered MD vs raw text
     6. Plain-text export   — one-click copy all content to clipboard
+    7. Always on top       — float above all windows (default ON, toggleable)
 
   Architecture: single HTML file, zero build step, zero npm dependencies.
 
@@ -732,15 +733,25 @@
 
   <script type="module">
     // ═══════════════════════════════════════════════════════════════════════
-    // Junk — frontend script (v3.0.0)
+    // Junk — frontend script (v3.0.9)
     //
-    // New features this version:
+    // Features (v3.0.9):
     //   1. Custom shortcut  — hotkey-key-input captures keydown, calls set_hotkey()
     //   2. Position memory  — saves outer_position after every drag, restores on show
+    //   2b. Always on top   — default ON, toggle in prefs, persisted in localStorage
     //   3. Font size        — slider 14–28px, saved to localStorage
     //   4. Dark mode        — light/auto/dark buttons, respects prefers-color-scheme
     //   5. Markdown preview — lightweight inline parser, toggled via ⌘M
     //   6. Export           — copies textarea content to clipboard from prefs
+    //
+    // KNOWN PITFALLS:
+    //   - Deep-commenting index.html to 2000+ lines causes 'Can\'t find variable:
+    //     windowEl' in WebKit/WKWebView (JavaScriptCore parses large ES modules
+    //     differently than Node.js). Keep the file under ~1700 lines.
+    //   - alwaysOnTop in tauri.conf.json only sets INITIAL state. Runtime toggle
+    //     requires set_always_on_top() IPC — tauri.conf is read once at startup.
+    //   - box-shadow is clipped by masksToBounds=YES (needed for rounded corners).
+    //     Use shadow:true in tauri.conf.json for the ambient drop shadow instead.
     //
     // IPC bridge (v2.8.0+):
     //   getInvoke() uses __TAURI_INTERNALS__.invoke (always available) with

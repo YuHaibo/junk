@@ -71,6 +71,7 @@ All notable changes to Junk are documented here. Format follows [Keep a Changelo
 - Fix: added `pointer-events: none` to `.footer-drag-handle`. Clicks pass
   straight through to buttons underneath. Drag still works because mousedown
   bubbles up through `<footer>` → `#window` where `start_dragging()` is called.
+- **Root cause note** — this fix made buttons appear correct in the diff but the window was still broken due to the unrelated deep-comment `windowEl` crash in `index.html` (see v3.0.8). v3.0.6 was never fully functional.
 
 ---
 
@@ -82,6 +83,7 @@ All notable changes to Junk are documented here. Format follows [Keep a Changelo
 - Dragging the window from the bottom bar works again. The footer's empty centre zone now has a dedicated invisible drag handle (`div.footer-drag-handle`) with `position: absolute` spanning the full footer height. Clicking it falls through to the `#window` `mousedown` listener which calls `start_dragging()` IPC.
 - Added subtle grip-dot indicator in the footer centre so the draggable area is visually discoverable.
 - `.footer` gets `position: relative` so the absolute handle is contained correctly.
+- **Regression introduced** — the `footer-drag-handle` div was `position:absolute` covering the full footer, blocking all button clicks. This was not caught before release. See v3.0.6 for the pointer-events fix, and v3.0.8 for the full resolution.
 
 ---
 

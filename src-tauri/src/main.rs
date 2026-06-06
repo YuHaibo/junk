@@ -41,6 +41,34 @@
 // │    set_hotkey(key, modifier)  → re-registers the toggle shortcut         │
 // └──────────────────────────────────────────────────────────────────────────┘
 //
+//
+// IMPORTANT LESSONS LEARNED (v3.0.4 → v3.0.9):
+//
+// 1. THE DEEP-COMMENT BUG (v3.0.4 → v3.0.8):
+//    Adding extensive inline comments to index.html, bloating it from
+//    ~1567 to 2067 lines, caused 'Can\'t find variable: windowEl' in
+//    WebKit/WKWebView at runtime. The file passed Node.js syntax checks
+//    perfectly — the failure was silent until the app was launched.
+//    Hypothesis: JavaScriptCore has a different compilation path for large
+//    ES modules that does not hoist variables the same way V8 does.
+//    Fix: revert to the pre-comment file (commit 4a18c56, 1567 lines).
+//    Rule: keep index.html under ~1700 lines.
+//
+// 2. ALWAYS ON TOP REGRESSION (v3.0.2 → v3.0.9):
+//    The v3.0.2 visual rework (frosted glass, rounded corners, shadow)
+//    changed alwaysOnTop from true to false in tauri.conf.json. This
+//    silently broke the core scratchpad UX — Junk no longer floated
+//    above other windows. tauri.conf only sets the INITIAL window level;
+//    runtime changes require set_always_on_top() IPC. Restored in v3.0.9
+//    with a Preferences toggle (default ON, localStorage-persisted).
+//
+// 3. box-shadow vs native shadow (v3.0.3 → v3.0.4):
+//    masksToBounds=YES (required for macOS rounded corners) clips the
+//    entire compositor subtree — including any CSS box-shadow drawn
+//    outside the window bounds. Use 'shadow: true' in tauri.conf.json
+//    to get the OS-level WindowServer shadow that sits below the clip.
+//
+// ─────────────────────────────────────────────────────────────────────────────
 // Why no unwrap() in production paths?
 // Tauri window operations return Result. In a shortcut callback there is no
 // caller to propagate errors to, so we log them instead of panicking. A panic

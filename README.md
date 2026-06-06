@@ -200,6 +200,14 @@ Keys not available: bare modifier keys (Shift, Ctrl, Meta) and Escape (already r
 
 The key is captured as `KeyboardEvent.code` (e.g. `"KeyJ"`, `"F2"`, `"Space"`) rather than `KeyboardEvent.key` (e.g. `"j"`, `"F2"`, `" "`). This is deliberate: `.code` is the physical key position on the keyboard, layout-independent — it works correctly on AZERTY, Dvorak, Colemak, and every other keyboard layout. `.key` would produce incorrect characters on non-QWERTY layouts.
 
+### Always on top
+
+Default: **enabled**. Keeps Junk's window floating above all other apps — the core scratchpad experience. Can be disabled from Preferences if you prefer the window to sit in normal z-order.
+
+This is implemented as a runtime IPC call (`set_always_on_top`) rather than a static config setting because `alwaysOnTop` in `tauri.conf.json` only sets the *initial* window level. Tauri does not watch the config for runtime changes — you must call `window.set_always_on_top()` via IPC to toggle it after the app is running.
+
+Preference is saved to `localStorage['junk-always-top']` (`'true'` or `'false'`). Default is `true` — the toggle is only `'false'` if the user has explicitly disabled it.
+
 ### Font size
 
 A slider from 14 px to 28 px drives a CSS custom property `--font-size` on `:root`. Both the editor textarea and the Markdown preview pick it up automatically — no JS duplication. Saved to `localStorage`.
@@ -853,6 +861,43 @@ The native WindowServer shadow automatically reduces its opacity in dark mode �
     0 0 0 0.5px rgba(255, 255, 255, 0.08);  /* light edge ring on dark bg */
 }
 ```
+
+</details>
+
+<details>
+<summary><strong>The deep-comment bug: JavaScriptCore vs V8 (v3.0.4 → v3.0.8)</strong></summary>
+
+### The deep-comment bug
+
+**What happened:**
+In v3.0.4, an educational documentation pass rewrote `index.html` from 1567 to 2067 lines by adding extensive inline comments. The file passed all static checks:
+- `node --check src/index.html` → no syntax errors
+- Manual brace-depth analysis → correctly balanced
+- AST walk → all variables declared before use (at the module level)
+
+But when running in Tauri's WKWebView (JavaScriptCore), the app produced:
+
+```
+ReferenceError: Can't find variable: windowEl
+  at registerDragListener — localhost:1847
+  at Module Code — localhost:1890
+```
+
+`windowEl` is declared as `const windowEl = document.getElementById('window')` near the top of the module. `registerDragListener` is an IIFE at the module's closing brace that references it.
+
+**Why it only failed in WebKit:**
+V8 (Node.js, Chrome DevTools) processes large ES modules without issue. JavaScriptCore (WebKit, used in WKWebView) appears to have a different compilation path for modules above a certain size threshold. The exact mechanism is unconfirmed — it may be related to lazy compilation, a JIT tier change, or a variable-resolution difference in how large module scopes are compiled. Regardless, the symptom is consistent: the file works below ~1700 lines and fails above ~2000.
+
+**Diagnosis process:**
+1. User reported all buttons non-functional after installing v3.0.7
+2. Console error: `ReferenceError: Can't find variable: windowEl`
+3. Searched git log for when `windowEl` was last changed → commit `3b7bef4` (deep-comment pass)
+4. `wc -l` comparison: `3b7bef4` = 2067 lines, working commit `4a18c56` = 1567 lines
+5. `git checkout 4a18c56 -- src/index.html` → confirmed crash gone
+
+**Fix:** `git checkout 4a18c56 -- src/index.html` (pre-deep-comment version, 2026-06-06, released as v3.0.8).
+
+**Rule going forward:** Keep `index.html` under ~1700 lines. Add documentation to `.md` files, not to the HTML module itself.
 
 </details>
 
@@ -1699,6 +1744,58 @@ See the "macOS rounded corners: the full investigation" section in Architecture 
 ---
 
 ## Changelog
+
+### v3.0.9 — 2026-06-06
+
+Always on top restored; preferences toggleable; version label fix; confirmed position/font/theme memory.
+
+- **Always on top restored** — The window's floating-above-all-windows behaviour was inadvertently disabled in v3.0.2 when `alwaysOnTop` was set to `false` in `tauri.conf.json` during the visual rework. Restored in v3.0.9 as a runtime feature: new `set_always_on_top(always_on_top: bool)` Rust IPC command, a toggle in Preferences ("Always on top — Keep Junk above all other windows"), default `ON`, persisted to `localStorage['junk-always-top']`, applied on every startup via `loadAlwaysOnTop()`. New capability permission: `core:window:allow-set-always-on-top`.
+- **Version label fix** — The version display in the Preferences panel footer was hardcoded to `v3.0.4`. Now set to the correct version; `loadVersionDisplay()` overwrites it with the live version from `check_for_update()` IPC.
+- **Window position memory** — confirmed fully wired: `saveWindowGeometry()` called after every drag (`mouseup`, 80 ms delay) and after every resize (300 ms debounce). `restoreWindowGeometry()` called on startup and on every `tauri://focus` event.
+- **Font size memory** — confirmed: `loadFontSize()` on startup reads `localStorage['junk-font-size']`, falls back to 22 px. Slider `input` event saves immediately.
+- **Dark mode persistence** — confirmed: `loadTheme()` on startup reads `localStorage['junk-theme']`, defaults to `'auto'`. Buttons save on click.
+
+---
+
+### v3.0.8 — 2026-06-06
+
+Critical fix: restore pre-deep-comment `index.html` — resolves `windowEl` ReferenceError.
+
+- **Root cause** — The educational documentation pass in v3.0.4 rewrote `index.html` from 1567 lines to 2067 lines by adding extensive inline comments. The resulting file passes Node.js syntax checks (`node --check`) and AST brace-depth analysis without issue, but causes `ReferenceError: Can't find variable: windowEl` in WebKit/WKWebView (JavaScriptCore) at runtime. All JavaScript stops executing at the crash point — clipboard copy, markdown toggle, settings panel, and window drag become completely non-functional.
+- **Diagnosis** — Console error pointed to `registerDragListener` at the module's closing IIFE, which references `windowEl` (a `const` declared at the module's top level). The crash only occurs in JavaScriptCore; V8 (Node.js, Chrome DevTools) parses the file cleanly. Hypothesis: JavaScriptCore has a different code-gen path for large ES modules and doesn't hoist module-scope `const` declarations in the same way V8 does when the script exceeds a certain size.
+- **Fix** — `git checkout 4a18c56 -- src/index.html` restores the 1567-line pre-comment version, which is confirmed working. The deep-commented version is preserved in git history at commit `3b7bef4` for reference.
+- **Rule learned** — Keep `index.html` under ~1700 lines. WebKit ES module parsing is not identical to V8's.
+
+---
+
+### v3.0.7 — 2026-06-06
+
+Revert attempt — replaced v3.0.5/v3.0.6 footer overlay with v3.0.4 `index.html`. Still broken because v3.0.4 already contained the deep-comment bug (introduced in the same release). Fixed definitively in v3.0.8.
+
+- **Attempted fix** — Reverted `src/index.html` to the v3.0.4 state, removing the `footer-drag-handle` div and `pointer-events:none` additions from v3.0.5/v3.0.6.
+- **Still broken** — v3.0.4's `index.html` was the 2067-line deep-commented version. The `windowEl` crash persisted. Root cause identified in v3.0.8.
+
+---
+
+### v3.0.6 — 2026-06-06
+
+Fix attempt: `pointer-events: none` on footer drag handle — partially fixed.
+
+- **Problem** — Footer buttons (markdown toggle, clipboard, settings) were still unresponsive after v3.0.5. The `footer-drag-handle` div (`position: absolute`) was blocking clicks even though it covered the full footer.
+- **Fix** — Added `pointer-events: none` to `.footer-drag-handle`. Clicks now pass through to buttons. Drag via the empty centre zone still works because `mousedown` bubbles up through `<footer>` → `#window` regardless.
+- **Still broken** — The `windowEl` ReferenceError from the deep-comment bug in `index.html` was already present in this version. The footer drag/buttons appeared fixed in the diff but were never actually testable.
+
+---
+
+### v3.0.5 — 2026-06-06
+
+Footer drag handle — dragging from bottom bar stopped working after v3.0.4.
+
+- **Problem** — After v3.0.4's visual polish (shadow, glass refinements), dragging the window from the footer's empty centre zone stopped working. Investigation showed the empty zone was no longer propagating `mousedown` events to the `#window` listener.
+- **Attempted fix** — Added a dedicated `div.footer-drag-handle` (`position: absolute`, full footer width/height) to the footer HTML, styled with `grab` cursor. The div's `mousedown` was expected to bubble up to `#window` and trigger `start_dragging()`.
+- **Regression introduced** — The overlay div covered the markdown, clipboard, and settings buttons, making them unresponsive. This was not caught before release. Fixed in v3.0.6 (`pointer-events: none`) and permanently resolved by reverting to the clean `index.html` in v3.0.8.
+
+---
 
 ### v3.0.4 — 2026-06-04
 

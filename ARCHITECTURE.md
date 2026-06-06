@@ -1,4 +1,4 @@
-# ARCHITECTURE.md — Junk v3.0.4
+# ARCHITECTURE.md — Junk v3.0.9
 
 > **Junk** — the flying scratchpad. Press `⌘J` / `Ctrl+J` anywhere, type, press `Esc`. No friction.
 >
@@ -30,6 +30,8 @@ This document is written for a new contributor who wants to understand every cor
    - [4.11 Inline markdown parser](#411-inline-markdown-parser)
    - [4.12 Update check: Rust HTTP, not JS fetch](#412-update-check-rust-http-not-js-fetch)
    - [4.13 tauri.conf.json key settings](#413-tauriconfjson-key-settings)
+   - [4.14 Always on top](#414-always-on-top)
+   - [4.15 The JavaScriptCore large-module bug](#415-the-javascriptcore-large-module-bug)
 5. [Rust Backend Deep Dive](#5-rust-backend-deep-dive)
    - [5.1 State management](#51-state-management)
    - [5.2 IPC command reference](#52-ipc-command-reference)
@@ -627,7 +629,53 @@ This is documented here because it is a genuine gotcha that will waste hours if 
 | `focus: false` | `false` | Don't steal focus at launch |
 | `csp: null` | `null` | No CSP; the app loads only local assets, no remote content |
 
-**Note on `alwaysOnTop`:** The task spec lists this as `true` but the actual `tauri.conf.json` has `false`. The Rust backend and JS prefs panel expose it as a user toggle. This reflects a deliberate design choice: always-on-top can be annoying during video calls or presentations, so it is off by default.
+**Note on `alwaysOnTop`:** The config has `false` because the runtime toggle (see §4.14) is the source of truth. The config value only sets the initial window level; the JS startup call to `set_always_on_top` overrides it on every launch.
+
+---
+
+### 4.14 Always on top
+
+Junk floats above all other windows by default — this is the core UX. A scratchpad is only useful if you can summon it over any app without it hiding behind a browser window.
+
+**The regression (v3.0.2):**
+During the visual rework that added frosted glass vibrancy, `alwaysOnTop` was changed to `false` in `tauri.conf.json`. The setting is easy to overlook because it is not near any of the visual properties that were being changed. The result: Junk appeared to work perfectly but no longer floated.
+
+**Why `tauri.conf.json` is not enough:**
+`alwaysOnTop: true` in the config sets the initial window level when the window is first created. It is not a live binding. If the user toggles it in Preferences, the config value is irrelevant — only the runtime call matters.
+
+**The fix (v3.0.9):**
+```rust
+#[tauri::command]
+fn set_always_on_top(app: AppHandle, always_on_top: bool) -> Result<(), String> {
+    let window = app.get_webview_window("main").ok_or("main window not found")?;
+    window.set_always_on_top(always_on_top).map_err(|e| e.to_string())
+}
+```
+
+Called from JS on every startup:
+```javascript
+async function loadAlwaysOnTop() {
+  const saved = localStorage.getItem('junk-always-top');
+  const on = saved !== 'false'; // null/undefined/true → ON
+  await ipc('set_always_on_top', { always_on_top: on });
+}
+```
+
+Default is ON (any localStorage value other than the string `'false'` enables it). The Preferences toggle lets the user disable it if they need to work under other windows.
+
+---
+
+### 4.15 The JavaScriptCore large-module bug
+
+**Symptom:** `ReferenceError: Can't find variable: windowEl` in WKWebView. All JS stops at the crash site. Clipboard, markdown, settings, drag — all non-functional.
+
+**Cause:** `index.html` was bloated from ~1567 to ~2067 lines by an inline documentation pass. The file passes Node.js (`node --check`) and V8 (Chrome DevTools) without error. JavaScriptCore (used in WKWebView on macOS) crashes when resolving module-scope `const` declarations from within an IIFE at the end of the module — but only when the file is large enough to trigger a different internal compilation path.
+
+**Detection:** The only way to catch this is to test in the actual WKWebView. `node --check` is not sufficient. AST analysis is not sufficient. The crash is silent until runtime.
+
+**Fix:** Keep `index.html` lean. Documentation belongs in `ARCHITECTURE.md`, `CONTRIBUTING.md`, and `README.md` — not inside the JS module.
+
+**Line count budget:** Stay under ~1700 lines in `index.html`. The confirmed safe version is 1567 lines (commit `4a18c56`). The confirmed broken version is 2067 lines (commit `3b7bef4`).
 
 ---
 
@@ -666,6 +714,7 @@ All commands are registered in `tauri::generate_handler![]`:
 | `get_window_size` | — | `Result<WindowSize, String>` | `{ width: u32, height: u32 }` physical |
 | `set_window_size` | `width: u32, height: u32` | `Result<(), String>` | Clamped to `300–3000 × 200–2000` |
 | `set_hotkey` | `key: String` | `Result<(), String>` | Key = `KeyboardEvent.code` string |
+| `set_always_on_top` | `always_on_top: bool` | `Result<(), String>` | Enables or disables floating above all windows. Called on startup and on Preferences toggle. |
 
 All commands return `Result<T, String>`. Errors surface to JS as rejected promises. This convention is enforced throughout — no `unwrap()` in IPC command bodies.
 
@@ -789,6 +838,7 @@ onFocus()
 | `junk-hotkey` | Code string (e.g. `'KeyJ'`, `'KeyK'`) | Custom toggle key; absent = default |
 | `junk-win-pos` | JSON `{"x": 100, "y": 200}` | Physical window position (pixels) |
 | `junk-win-size` | JSON `{"w": 720, "h": 460}` | Physical window size (pixels) |
+| `junk-always-top` | `'true'` / `'false'` | Whether window floats above all other windows. Default `'true'` (any value other than `'false'` enables it). |
 
 All keys are prefixed with `junk-` to avoid collisions if the WebView origin ever shares storage with other apps (it shouldn't in production Tauri, but defensive namespacing is free).
 
@@ -956,6 +1006,11 @@ Bump both before tagging. The Rust code uses `env!("CARGO_PKG_VERSION")` — it 
 
 | Version | Key change |
 |---|---|
+| v3.0.9 | Always-on-top restored as runtime `set_always_on_top` IPC command; version label fix; confirmed position/font/theme memory wiring |
+| v3.0.8 | Critical fix: reverted `index.html` to pre-deep-comment commit `4a18c56` (1567 lines) — resolves JavaScriptCore `windowEl` ReferenceError |
+| v3.0.7 | Revert attempt: restored v3.0.4 `index.html` — still broken (v3.0.4 was the deep-comment version). Fixed in v3.0.8. |
+| v3.0.6 | Added `pointer-events: none` to `.footer-drag-handle` — unblocks footer buttons. Still broken due to deep-comment bug. |
+| v3.0.5 | Added `div.footer-drag-handle` overlay to restore footer drag — introduced button-blocking regression. |
 | v3.0.4 | `shadow: true` in `tauri.conf.json` — native macOS drop shadow via WindowServer (fixes CSS shadow clipped by `masksToBounds`) |
 | v3.0.3 | Two-step rounded corners: `apply_vibrancy` + `set_macos_window_corner_radius()` via `objc2` CALayer `masksToBounds` |
 | v3.0.0 | Custom hotkey, window position memory, font size picker, dark mode, markdown preview, plain-text export |
