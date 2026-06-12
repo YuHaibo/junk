@@ -1,10 +1,10 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
 
-  "productName": "Junk",
+  "productName": "Floaty",
   "version": "3.1.0",
 
-  "identifier": "com.paulfleury.junk",
+  "identifier": "com.haibo.floaty",
 
   "build": {
     "beforeDevCommand": "",
@@ -44,6 +44,8 @@
 
         "alwaysOnTop": true,
 
+        "visibleOnAllWorkspaces": true,
+
         "skipTaskbar": true,
 
         "visible": false,
@@ -78,7 +80,7 @@
 
     "category": "Productivity",
 
-    "shortDescription": "Global-hotkey scratchpad",
+    "shortDescription": "Floating scratchpad",
 
     "longDescription": "Press ⌘J (macOS) or Ctrl+J (Windows/Linux) to summon a floating notepad anywhere on screen. Content auto-saves. No Dock icon, no Taskbar icon — pure scratchpad.",
 
@@ -99,7 +101,7 @@
       "timestampUrl": "",
       "tsp": false,
       "webviewInstallMode": {
-        "type": "downloadBootstrapper"
+        "type": "skip"
       },
       "nsis": {
         "languages": ["English"]

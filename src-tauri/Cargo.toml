@@ -1,11 +1,11 @@
 [package]
 # The binary crate name. Tauri uses this as the executable name on all platforms.
-name = "junk"
+name = "floaty"
 version = "3.1.0"
 edition = "2021"
 # Minimum supported Rust version. 1.70 is the floor for Tauri v2.
 rust-version = "1.70"
-description = "A global-hotkey scratchpad — press ⌘J/Ctrl+J to summon a floating notepad anywhere."
+description = "A floating global-hotkey scratchpad — press ⌘J/Ctrl+J to summon it anywhere."
 authors = ["Paul Fleury"]
 homepage = "https://thejunk.app"
 repository = "https://github.com/paulfxyz/junk"
@@ -27,7 +27,7 @@ tauri-build = { version = "2", features = [] }
 # Core Tauri framework — brings in the WebView, IPC, window management, etc.
 # We enable "devtools" so developers can open the inspector in debug builds.
 # Note: tray-icon feature removed in v2.6.0 — we no longer use the system tray.
-tauri = { version = "2", features = ["devtools"] }
+tauri = { version = "2.10.1", features = ["macos-private-api", "devtools"] }
 
 # Global shortcut plugin (Tauri v2 splits plugins out of core).
 # This replaces the old tauri::GlobalShortcutManager from v1.
@@ -39,22 +39,15 @@ tauri-plugin-global-shortcut = "2"
 # On Linux: creates/removes ~/.config/autostart/<app>.desktop.
 tauri-plugin-autostart = "2"
 
-# HTTP client plugin — allows Rust code to make outbound HTTP requests.
-# Used for the update checker: fetches api.github.com/repos/paulfxyz/junk/releases/latest
-# from Rust rather than from the WebView's fetch(), which can be blocked by
-# the WebView's Content Security Policy in some environments.
-tauri-plugin-http = { version = "2", features = ["rustls-tls"] }
-
 # Serialisation — required for passing data across the Tauri IPC bridge.
 # Every type that crosses invoke() / emit() must implement Serialize/Deserialize.
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
 
 # Structured, levelled logging. We call log::info!/log::warn!/log::error!
 # throughout main.rs; the env_logger subscriber (below) routes them to stderr.
 log = "0.4"
 
-# The simplest env-filter logger — reads RUST_LOG=junk=debug at runtime.
+# The simplest env-filter logger — reads RUST_LOG=floaty=debug at runtime.
 # Only activated in debug builds (see profile section below) to keep release
 # binaries lean.
 env_logger = "0.11"

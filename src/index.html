@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <!--
-  Junk — frontend (v3.1.0)
+  Floaty — frontend (v3.1.0)
   ═══════════════════════════════════════════════════════════════════════════════
 
   Features (current as of v3.0.9):
     1. Custom shortcut     — change ⌘J to any key via Preferences
     2. Window position     — drag position + size remembered across sessions
-    3. Font size           — 14–28px, saved in localStorage
+    3. Font size           — 9–24px, saved in localStorage
     4. Dark mode           — auto (system) or manual light/dark toggle
     5. Markdown preview    — toggle rendered MD vs raw text
     6. Plain-text export   — one-click copy all content to clipboard
@@ -21,7 +21,7 @@
 
   Markdown: rendered via a lightweight inline parser — no external library.
     Handles: h1-h3, bold, italic, code, blockquote, hr, ul/ol, links, br.
-    Kept intentionally minimal — Junk is a scratchpad, not a doc editor.
+    Kept intentionally minimal — Floaty is a scratchpad, not a doc editor.
 
   Dark mode: uses CSS custom properties on :root[data-theme="dark"].
     In 'auto' mode, JS reads prefers-color-scheme and applies the right theme.
@@ -37,10 +37,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Junk</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&display=swap" rel="stylesheet" />
+  <title>Floaty</title>
 
   <style>
     /* ── CSS custom properties — theme tokens ──────────────────────────────── */
@@ -150,18 +147,19 @@
     #editor {
       flex: 1;
       width: 100%;
-      padding: 22px 26px 0;
+      padding: 18px 22px 0;
       background: transparent;
       border: none;
       outline: none;
       resize: none;
       color: var(--text-primary);
-      /* font-size driven by --font-size CSS var, default 22px */
-      font-size: var(--font-size, 22px);
-      font-family: inherit;
+      /* font-size driven by --font-size CSS var, default 12px */
+      font-size: var(--font-size, 12px);
+      font-family: 'Maple Mono NF CN', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
       font-weight: 400;
-      line-height: 1.8;
-      letter-spacing: -0.01em;
+      line-height: 1.42;
+      letter-spacing: 0;
+      font-variant-ligatures: none;
       caret-color: var(--accent);
       transition: font-size 0.15s, color 0.2s;
       overflow-y: auto;
@@ -182,12 +180,13 @@
     /* ── Markdown preview pane (replaces textarea when MD mode is on) ──────── */
     #md-preview {
       flex: 1;
-      padding: 22px 26px 0;
+      padding: 18px 22px 0;
       overflow-y: auto;
       color: var(--text-primary);
-      font-size: var(--font-size, 22px);
-      font-family: inherit;
-      line-height: 1.8;
+      font-size: var(--font-size, 12px);
+      font-family: 'Maple Mono NF CN', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      line-height: 1.42;
+      letter-spacing: 0;
       display: none;
       transition: color 0.2s;
     }
@@ -315,13 +314,13 @@
     }
 
     .prefs-open #prefs-panel {
-      /* Use a generous max-height (90% of window) so all options are visible. */
+      /* Keep the panel tall enough that preference rows are not clipped.       */
       /* The prefs-inner div scrolls if content overflows.                     */
-      height: min(460px, calc(100% - 44px));
+      height: min(720px, calc(100% - 18px));
     }
 
     .prefs-inner {
-      padding: 16px 18px 20px;
+      padding: 16px 18px 28px;
       height: 100%;
       overflow-y: auto;
       overflow-x: hidden;
@@ -497,7 +496,7 @@
       color: #fff;
     }
 
-    /* ── Export / update area ────────────────────────────────────────────────── */
+    /* ── Export area ─────────────────────────────────────────────────────────── */
     .prefs-actions {
       display: flex; gap: 6px;
     }
@@ -517,17 +516,6 @@
     .action-btn:active { background: var(--btn-active); }
     .action-btn.copied { color: var(--success); border-color: var(--success); }
 
-    /* ── Update status ───────────────────────────────────────────────────────── */
-    #update-status {
-      font-size: 11px;
-      color: var(--text-secondary);
-      padding: 4px 12px 0;
-      min-height: 18px;
-    }
-    #update-status.up-to-date   { color: var(--success); }
-    #update-status.update-available { color: var(--accent); }
-    #update-status.update-error { color: var(--danger); }
-
     /* ── Credits row ─────────────────────────────────────────────────────────── */
     .credits-row {
       display: flex; align-items: center; justify-content: space-between;
@@ -538,6 +526,23 @@
     }
     .credits-text a { color: var(--accent); text-decoration: none; }
     .credits-text a:hover { text-decoration: underline; }
+    .quit-btn {
+      padding: 4px 8px;
+      border: 1px solid var(--input-border);
+      border-radius: 6px;
+      background: var(--input-bg);
+      font-family: inherit;
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+    }
+    .quit-btn:hover {
+      background: var(--btn-hover);
+      border-color: var(--danger);
+      color: var(--danger);
+    }
     #current-version {
       font-size: 10.5px;
       font-weight: 600;
@@ -580,6 +585,15 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="9" y="9" width="13" height="13" rx="2"/>
             <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+        </button>
+        <!-- Copy all and close -->
+        <button class="icon-btn" id="btn-copy-close" title="Copy all to clipboard and close">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="8" y="4" width="10" height="10" rx="2"/>
+            <path d="M5 10H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-1"/>
+            <path d="M17 16v5"/>
+            <path d="m14 18 3 3 3-3"/>
           </svg>
         </button>
         <span id="save-status">saved</span>
@@ -630,10 +644,10 @@
               <span class="prefs-row-hint">Applies to the scratchpad text</span>
             </span>
             <div class="font-size-row" style="width:100%;">
-              <span style="font-size:10px;color:var(--text-secondary);">14</span>
-              <input type="range" id="font-size-slider" min="14" max="28" step="1" value="22" />
-              <span style="font-size:10px;color:var(--text-secondary);">28</span>
-              <span id="font-size-label">22px</span>
+              <span style="font-size:10px;color:var(--text-secondary);">9</span>
+              <input type="range" id="font-size-slider" min="9" max="24" step="1" value="12" />
+              <span style="font-size:10px;color:var(--text-secondary);">24</span>
+              <span id="font-size-label">12px</span>
             </div>
           </div>
 
@@ -671,7 +685,7 @@
           <div class="prefs-row">
             <span class="prefs-row-label">
               Always on top
-              <span class="prefs-row-hint">Keep Junk above all other windows</span>
+              <span class="prefs-row-hint">Keep Floaty above all other windows</span>
             </span>
             <label class="toggle-wrap">
               <input type="checkbox" id="toggle-always-on-top" checked />
@@ -683,22 +697,10 @@
           <div class="prefs-row">
             <span class="prefs-row-label">
               Launch at login
-              <span class="prefs-row-hint">Start Junk automatically when you log in</span>
+              <span class="prefs-row-hint">Start Floaty automatically when you log in</span>
             </span>
             <label class="toggle-wrap">
               <input type="checkbox" id="toggle-launch" />
-              <span class="toggle-track"></span>
-            </label>
-          </div>
-
-          <!-- Auto-update -->
-          <div class="prefs-row">
-            <span class="prefs-row-label">
-              Check for updates
-              <span class="prefs-row-hint">Checks GitHub on launch</span>
-            </span>
-            <label class="toggle-wrap">
-              <input type="checkbox" id="toggle-autoupdate" checked />
               <span class="toggle-track"></span>
             </label>
           </div>
@@ -708,21 +710,12 @@
         <!-- Actions row -->
         <div class="prefs-actions">
           <button class="action-btn" id="btn-export">Copy all text</button>
-          <button class="action-btn" id="check-update-btn">Check for updates</button>
         </div>
-
-        <div id="update-status"></div>
 
         <!-- Credits -->
         <div class="credits-row">
-          <span class="credits-text">
-            <a href="https://thejunk.app" target="_blank">thejunk.app</a>
-            &nbsp;·&nbsp;
-            <a href="https://github.com/paulfxyz/junk" target="_blank">GitHub</a>
-            &nbsp;·&nbsp;
-            To fully quit: Activity Monitor → Junk → quit
-          </span>
-          <span id="current-version">v3.0.9</span>
+          <button class="quit-btn" id="btn-quit" type="button">Quit</button>
+          <span id="current-version">v3.1.0</span>
         </div>
 
       </div>
@@ -733,13 +726,13 @@
 
   <script type="module">
     // ═══════════════════════════════════════════════════════════════════════
-    // Junk — frontend script (v3.1.0)
+    // Floaty — frontend script (v3.1.0)
     //
     // Features (v3.1.0):
     //   1. Custom shortcut  — hotkey-key-input captures keydown, calls set_hotkey()
     //   2. Position memory  — saves outer_position after every drag, restores on show
     //   2b. Always on top   — default ON, toggle in prefs, persisted in localStorage
-    //   3. Font size        — slider 14–28px, saved to localStorage
+    //   3. Font size        — slider 9–24px, saved to localStorage
     //   4. Dark mode        — light/auto/dark buttons, respects prefers-color-scheme
     //   5. Markdown preview — lightweight inline parser, toggled via ⌘M
     //   6. Export           — copies textarea content to clipboard from prefs
@@ -794,14 +787,12 @@
     const footerPrefsBtn  = document.getElementById('footer-prefs-btn');
     const toggleAlwaysOnTop = document.getElementById('toggle-always-on-top');
     const toggleLaunch    = document.getElementById('toggle-launch');
-    const toggleAutoUpdate= document.getElementById('toggle-autoupdate');
     const toggleMarkdown  = document.getElementById('toggle-markdown');
-    const checkUpdateBtn  = document.getElementById('check-update-btn');
-    const updateStatus    = document.getElementById('update-status');
-    const currentVersionEl= document.getElementById('current-version');
     const btnMd           = document.getElementById('btn-md');
     const btnCopy         = document.getElementById('btn-copy');
+    const btnCopyClose    = document.getElementById('btn-copy-close');
     const btnExport       = document.getElementById('btn-export');
+    const btnQuit         = document.getElementById('btn-quit');
     const hotkeyInput     = document.getElementById('hotkey-key-input');
     const hotkeyModifier  = document.getElementById('hotkey-modifier');
     const hotkeyStatus    = document.getElementById('hotkey-status');
@@ -811,8 +802,7 @@
 
     // ── localStorage keys ────────────────────────────────────────────────────
     const KEY_CONTENT     = 'junk-content';
-    const KEY_AUTO_UPDATE = 'junk-auto-update';
-    const KEY_FONT_SIZE   = 'junk-font-size';
+    const KEY_FONT_SIZE   = 'floaty-font-size';
     const KEY_THEME       = 'junk-theme';       // 'light' | 'auto' | 'dark'
     const KEY_MD_MODE     = 'junk-md-mode';     // 'true' | 'false'
     const KEY_HOTKEY      = 'junk-hotkey';      // e.g. 'KeyJ'
@@ -861,6 +851,10 @@
     // ── Hide window ──────────────────────────────────────────────────────────
     async function hideWindow() {
       await ipc('hide_window');
+    }
+
+    function quitApp() {
+      ipc('quit_app').catch(err => console.error('[quit] quit_app failed:', err));
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -1052,7 +1046,7 @@
     // FEATURE 2b: Always on top
     // ════════════════════════════════════════════════════════════════════════
     //
-    // Junk’s core UX is floating above all windows — it’s a scratchpad you
+    // Floaty’s core UX is floating above all windows — it’s a scratchpad you
     // summon instantly and it should stay visible. This was the original default
     // (alwaysOnTop: true in tauri.conf.json) but was inadvertently set to false
     // during the v3.0.2 visual rework.
@@ -1097,7 +1091,7 @@
 
     function loadFontSize() {
       const saved = parseInt(localStorage.getItem(KEY_FONT_SIZE), 10);
-      const size = (saved >= 14 && saved <= 28) ? saved : 22;
+      const size = (saved >= 9 && saved <= 24) ? saved : 12;
       applyFontSize(size);
     }
 
@@ -1236,8 +1230,7 @@
         s = s.replace(/\*(.+?)\*/g, '<em>$1</em>');
         s = s.replace(/_(.+?)_/g, '<em>$1</em>');
         // Links [text](url)
-        s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g,
-          '<a href="$2" target="_blank" rel="noopener">$1</a>');
+        s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1 ($2)');
         return s;
       }
 
@@ -1354,7 +1347,7 @@
 
     async function copyAllToClipboard(sourceBtn) {
       const text = editor.value;
-      if (!text) return;
+      if (!text) return true;
 
       try {
         await navigator.clipboard.writeText(text);
@@ -1384,9 +1377,16 @@
           sourceBtn.title = origTitle;
           sourceBtn.classList.remove('copied');
         }, 1600);
+        return true;
       } catch (err) {
         console.error('[export] clipboard.writeText failed:', err);
+        return false;
       }
+    }
+
+    async function copyAllToClipboardAndClose(sourceBtn) {
+      const copied = await copyAllToClipboard(sourceBtn);
+      if (copied) await hideWindow();
     }
 
     // ── Preferences panel ────────────────────────────────────────────────────
@@ -1396,13 +1396,7 @@
       if (prefsOpen) return;
       prefsOpen = true;
       windowEl.classList.add('prefs-open');
-      await Promise.allSettled([
-        loadLaunchAtLogin(),
-        loadVersionDisplay(),
-      ]);
-      const autoUpdate = localStorage.getItem(KEY_AUTO_UPDATE);
-      toggleAutoUpdate.checked = autoUpdate !== 'false';
-      setUpdateStatus('', '');
+      await loadLaunchAtLogin();
     }
 
     function closePrefs() {
@@ -1431,53 +1425,6 @@
         toggleLaunch.checked = !enabled;
         console.error('[prefs] set_launch_at_login failed:', err);
       }
-    }
-
-    // ── Version display ──────────────────────────────────────────────────────
-    async function loadVersionDisplay() {
-      try {
-        const result = await ipc('check_for_update');
-        if (result?.current) currentVersionEl.textContent = `v${result.current}`;
-      } catch {
-        currentVersionEl.textContent = 'v?';
-      }
-    }
-
-    // ── Update check ─────────────────────────────────────────────────────────
-    function setUpdateStatus(msg, cls) {
-      updateStatus.textContent = '';
-      updateStatus.className = '';
-      if (msg) updateStatus.textContent = msg;
-      if (cls) updateStatus.classList.add(cls);
-    }
-
-    async function checkForUpdate({ silent = false } = {}) {
-      checkUpdateBtn.disabled = true;
-      if (!silent) setUpdateStatus('Checking…', '');
-      try {
-        const result = await ipc('check_for_update');
-        if (!result) { setUpdateStatus('Could not reach GitHub — are you online?', 'update-error'); return; }
-        if (result.current) currentVersionEl.textContent = `v${result.current}`;
-        if (result.up_to_date) {
-          setUpdateStatus(`You're up to date (${result.current})`, 'up-to-date');
-        } else {
-          updateStatus.className = 'update-available';
-          const link = document.createElement('a');
-          link.href = result.url; link.target = '_blank'; link.rel = 'noopener noreferrer';
-          link.textContent = `Update available: v${result.latest}`;
-          link.style.cssText = 'color:var(--accent);font-weight:500;';
-          updateStatus.appendChild(link);
-        }
-      } catch {
-        setUpdateStatus('Could not check — are you online?', 'update-error');
-      } finally {
-        checkUpdateBtn.disabled = false;
-      }
-    }
-
-    function maybeAutoCheckOnStartup() {
-      if (localStorage.getItem(KEY_AUTO_UPDATE) === 'false') return;
-      setTimeout(() => checkForUpdate({ silent: true }).catch(() => {}), 2000);
     }
 
     // ── Tauri event listeners ────────────────────────────────────────────────
@@ -1601,16 +1548,13 @@
     toggleAlwaysOnTop.addEventListener('change', () => applyAlwaysOnTop(toggleAlwaysOnTop.checked));
     toggleLaunch.addEventListener('change', onLaunchAtLoginChange);
 
-    toggleAutoUpdate.addEventListener('change', () => {
-      localStorage.setItem(KEY_AUTO_UPDATE, String(toggleAutoUpdate.checked));
-    });
-
     toggleMarkdown.addEventListener('change', () => setMdMode(toggleMarkdown.checked));
 
     btnMd.addEventListener('click', () => setMdMode(!mdMode));
     btnCopy.addEventListener('click', () => copyAllToClipboard(btnCopy));
+    btnCopyClose.addEventListener('click', () => copyAllToClipboardAndClose(btnCopyClose));
     btnExport.addEventListener('click', () => copyAllToClipboard(btnExport));
-    checkUpdateBtn.addEventListener('click', () => checkForUpdate({ silent: false }));
+    btnQuit.addEventListener('click', quitApp);
 
     // ── Startup sequence ─────────────────────────────────────────────────────
     loadContent();
@@ -1620,13 +1564,12 @@
     loadAlwaysOnTop();
     initHotkeyDisplay();
     setupTauriEvents();
-    maybeAutoCheckOnStartup();
     restoreWindowPosition();
 
     // Restore custom hotkey (re-registers in Rust if user had changed it)
     restoreHotkey().catch(() => {});
 
-    console.log('[junk] v3.1.0 loaded. IPC bridge:', getInvoke() ? 'OK' : 'NOT FOUND');
+    console.log('[floaty] v3.1.0 loaded. IPC bridge:', getInvoke() ? 'OK' : 'NOT FOUND');
   </script>
 </body>
 </html>

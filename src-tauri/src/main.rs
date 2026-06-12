@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Junk — a global-hotkey scratchpad built with Tauri v2
+// Floaty — a global-hotkey scratchpad built with Tauri v2
 //
 // Architecture overview (v3.0.4)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -35,7 +35,6 @@
 // │    open_prefs()               → emits 'open-prefs' event to JS           │
 // │    get_prefs()                → { launch_at_login }                      │
 // │    set_launch_at_login(bool)  → enables/disables OS login item           │
-// │    check_for_update()         → Rust HTTP → GitHub API → JSON            │
 // │    get_window_position()      → { x, y } physical screen coords          │
 // │    set_window_position(x, y)  → moves window to (x, y) on screen        │
 // │    set_hotkey(key, modifier)  → re-registers the toggle shortcut         │
@@ -57,7 +56,7 @@
 // 2. ALWAYS ON TOP REGRESSION (v3.0.2 → v3.0.9):
 //    The v3.0.2 visual rework (frosted glass, rounded corners, shadow)
 //    changed alwaysOnTop from true to false in tauri.conf.json. This
-//    silently broke the core scratchpad UX — Junk no longer floated
+//    silently broke the core scratchpad UX — Floaty no longer floated
 //    above other windows. tauri.conf only sets the INITIAL window level;
 //    runtime changes require set_always_on_top() IPC. Restored in v3.0.9
 //    with a Preferences toggle (default ON, localStorage-persisted).
@@ -114,15 +113,6 @@ struct Prefs {
     launch_at_login: bool,
 }
 
-/// Update check result returned from `check_for_update()`.
-#[derive(serde::Serialize)]
-struct UpdateResult {
-    up_to_date: bool,
-    current: String,
-    latest: String,
-    url: String,
-}
-
 /// Window position returned from `get_window_position()`.
 /// Physical screen coordinates, top-left origin.
 #[derive(serde::Serialize)]
@@ -151,6 +141,13 @@ fn hide_window(app: AppHandle) -> Result<(), String> {
         .get_webview_window("main")
         .ok_or("main window not found")?;
     window.hide().map_err(|e| e.to_string())
+}
+
+/// Quit the app process completely.
+#[tauri::command]
+fn quit_app(app: AppHandle) {
+    log::info!("quit_app requested from frontend — shutting down.");
+    app.exit(0);
 }
 
 /// Initiate a native OS window drag.
@@ -191,11 +188,11 @@ fn get_prefs(app: AppHandle) -> Result<Prefs, String> {
     Ok(Prefs { launch_at_login })
 }
 
-/// Enable or disable the OS login item for Junk.
+/// Enable or disable the OS login item for Floaty.
 ///
 /// macOS:   creates/removes ~/Library/LaunchAgents/<bundle-id>.plist
 /// Windows: writes/removes HKCU\...\Microsoft\Windows\CurrentVersion\Run
-/// Linux:   creates/removes ~/.config/autostart/junk.desktop
+/// Linux:   creates/removes ~/.config/autostart/<app>.desktop
 #[tauri::command]
 fn set_launch_at_login(app: AppHandle, enabled: bool) -> Result<(), String> {
     let mgr = app.autolaunch();
@@ -210,73 +207,6 @@ fn set_launch_at_login(app: AppHandle, enabled: bool) -> Result<(), String> {
             format!("Failed to disable launch at login: {e}")
         })
     }
-}
-
-/// Check GitHub releases API for a newer version of Junk.
-///
-/// HTTP fetch is done from Rust (tauri-plugin-http / reqwest) rather than JS:
-///   - JS window.fetch() can be blocked by the WebView Content Security Policy.
-///   - Rust has compile-time access to CARGO_PKG_VERSION via env!().
-///
-/// GOTCHA: tauri_plugin_http's reqwest re-export does NOT enable the `json`
-/// feature, so resp.json::<T>().await fails to compile. Always use
-/// .text().await + serde_json::from_str() instead.
-#[tauri::command]
-async fn check_for_update() -> Result<UpdateResult, String> {
-    let current = env!("CARGO_PKG_VERSION").to_string();
-    let api_url = "https://api.github.com/repos/paulfxyz/junk/releases/latest";
-    let releases_page = "https://github.com/paulfxyz/junk/releases".to_string();
-
-    let client = tauri_plugin_http::reqwest::Client::builder()
-        .user_agent(format!("Junk/{}", env!("CARGO_PKG_VERSION")))
-        .build()
-        .map_err(|e| format!("HTTP client build failed: {e}"))?;
-
-    let resp = client
-        .get(api_url)
-        .header("Accept", "application/vnd.github+json")
-        .send()
-        .await
-        .map_err(|e| format!("HTTP request failed: {e}"))?;
-
-    if !resp.status().is_success() {
-        return Err(format!("GitHub API returned {}", resp.status()));
-    }
-
-    let text = resp
-        .text()
-        .await
-        .map_err(|e| format!("Failed to read response body: {e}"))?;
-
-    let body: serde_json::Value = serde_json::from_str(&text)
-        .map_err(|e| format!("JSON parse failed: {e}"))?;
-
-    let tag = body
-        .get("tag_name")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .trim_start_matches('v')
-        .to_string();
-
-    if tag.is_empty() {
-        return Err("Could not parse tag_name from GitHub response".to_string());
-    }
-
-    let up_to_date = tag == current;
-    let url = if up_to_date {
-        releases_page.clone()
-    } else {
-        format!("https://github.com/paulfxyz/junk/releases/tag/v{}", tag)
-    };
-
-    log::info!("Update check: current={current} latest={tag} up_to_date={up_to_date}");
-
-    Ok(UpdateResult {
-        up_to_date,
-        current,
-        latest: tag,
-        url,
-    })
 }
 
 /// Return the current window position as physical screen coordinates.
@@ -347,7 +277,7 @@ fn set_window_size(app: AppHandle, width: u32, height: u32) -> Result<(), String
 
 /// Enable or disable the "always on top" window level.
 ///
-/// Junk is a scratchpad — staying on top of other windows is its core UX.
+/// Floaty is a scratchpad — staying on top of other windows is its core UX.
 /// This was the default behaviour before v3.0.2 (when `alwaysOnTop: true` was
 /// set in tauri.conf.json). The aesthetic rework changed that to `false` to
 /// allow the native shadow to render correctly, but the feature itself must
@@ -495,6 +425,11 @@ fn toggle_window(window: &WebviewWindow) {
 /// may appear but the previous app still has the keyboard. `set_focus()` fixes
 /// this by bringing both the window and the app process to the front.
 fn show_and_focus(window: &WebviewWindow) {
+    #[cfg(target_os = "macos")]
+    unsafe {
+        apply_macos_space_behavior(window);
+    }
+
     if let Err(e) = window.show() {
         log::error!("show_and_focus: show failed: {e}");
         return;
@@ -600,7 +535,7 @@ fn register_prefs_shortcut(app: &AppHandle) -> Result<(), String> {
 
 // ── macOS dock / activation policy ───────────────────────────────────────────
 
-/// Remove Junk from the macOS Dock and ⌘-Tab app switcher.
+/// Remove Floaty from the macOS Dock and ⌘-Tab app switcher.
 ///
 /// `Accessory` policy: hides Dock icon, still receives keyboard focus.
 /// Must be called before any window appears to avoid a flash of the icon.
@@ -675,14 +610,54 @@ unsafe fn set_macos_window_corner_radius(window: &tauri::WebviewWindow, radius: 
     log::info!("macOS contentView layer cornerRadius={radius} masksToBounds=YES");
 }
 
+/// Make the floating panel available over macOS fullscreen Spaces.
+///
+/// `alwaysOnTop` only raises a window within the current Space. Native
+/// fullscreen apps live in their own Space, so Floaty must opt into joining
+/// all Spaces and being allowed as a fullscreen auxiliary window.
+#[cfg(target_os = "macos")]
+unsafe fn apply_macos_space_behavior(window: &tauri::WebviewWindow) {
+    use objc2::msg_send;
+    use objc2::runtime::AnyObject;
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+
+    let Ok(handle) = window.window_handle() else { return };
+    let RawWindowHandle::AppKit(appkit) = handle.as_raw() else { return };
+
+    let ns_view: *mut AnyObject = appkit.ns_view.as_ptr().cast();
+    let ns_window: *mut AnyObject = msg_send![ns_view, window];
+    if ns_window.is_null() {
+        log::warn!("apply_macos_space_behavior: [nsView window] returned nil");
+        return;
+    }
+
+    // NSWindowCollectionBehavior:
+    //   CanJoinAllSpaces      = 1 << 0
+    //   Transient             = 1 << 3
+    //   FullScreenAuxiliary   = 1 << 8
+    let current: usize = msg_send![ns_window, collectionBehavior];
+    let behavior = current | (1 << 0) | (1 << 3) | (1 << 8);
+    let () = msg_send![ns_window, setCollectionBehavior: behavior];
+
+    // NSStatusWindowLevel = 25. Higher than FloatingWindowLevel, but below
+    // menu popups; enough for launchers/panels over fullscreen apps.
+    let () = msg_send![ns_window, setLevel: 25isize];
+
+    if let Err(e) = window.set_visible_on_all_workspaces(true) {
+        log::warn!("set_visible_on_all_workspaces(true) failed: {e}");
+    }
+
+    log::info!("macOS fullscreen Space behavior applied");
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 fn main() {
     #[cfg(debug_assertions)]
-    std::env::set_var("RUST_LOG", "junk=debug,tauri=info");
+    std::env::set_var("RUST_LOG", "floaty=debug,tauri=info");
 
     env_logger::init();
-    log::info!("Junk v{} starting up", env!("CARGO_PKG_VERSION"));
+    log::info!("Floaty v{} starting up", env!("CARGO_PKG_VERSION"));
 
     // Default shortcut — ⌘J on macOS, Ctrl+J elsewhere.
     // We need this value before setup() runs so we can put it in app state.
@@ -706,7 +681,6 @@ fn main() {
             MacosLauncher::LaunchAgent,
             None::<Vec<&str>>,
         ))
-        .plugin(tauri_plugin_http::init())
         // ── Setup hook ────────────────────────────────────────────────────────
         .setup(|app| {
             let handle = app.handle();
@@ -740,6 +714,9 @@ fn main() {
                     // (including the WKWebView) to the rounded rect. Without this,
                     // the WKWebView renders over the rounded blur corners as a square.
                     unsafe { set_macos_window_corner_radius(&window, RADIUS) };
+
+                    // Allow Floaty to appear over apps in native fullscreen Spaces.
+                    unsafe { apply_macos_space_behavior(&window) };
                 }
 
                 #[cfg(target_os = "windows")]
@@ -774,17 +751,17 @@ fn main() {
                 log::warn!("Prefs shortcut (⌘,) registration failed: {e}");
             }
 
-            log::info!("Setup complete. Junk v{} is ready.", env!("CARGO_PKG_VERSION"));
+            log::info!("Setup complete. Floaty v{} is ready.", env!("CARGO_PKG_VERSION"));
             Ok(())
         })
         // ── IPC commands ──────────────────────────────────────────────────────
         .invoke_handler(tauri::generate_handler![
             hide_window,
+            quit_app,
             start_dragging,
             open_prefs,
             get_prefs,
             set_launch_at_login,
-            check_for_update,
             get_window_position,
             set_window_position,
             get_window_size,
@@ -810,10 +787,9 @@ fn main() {
                 }
             }
 
-            // ⌘Q → quit for real.
+            // ⌘Q / Quit button → quit for real.
             RunEvent::ExitRequested { .. } => {
-                log::info!("ExitRequested (⌘Q) — shutting down.");
-                app.exit(0);
+                log::info!("ExitRequested — shutting down.");
             }
 
             _ => {}
